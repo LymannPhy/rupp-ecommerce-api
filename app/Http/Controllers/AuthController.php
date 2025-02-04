@@ -17,6 +17,32 @@ use App\Models\Role;
 
 class AuthController extends Controller
 {
+
+    /**
+     * Log out the authenticated user by revoking tokens.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function logout(Request $request)
+    {
+        try {
+            // Get authenticated user
+            $user = auth()->user();
+
+            if (!$user) {
+                return ApiResponse::throw('Unauthorized', ['error' => 'No authenticated user found'], 401);
+            }
+
+            // Revoke all tokens
+            $user->tokens()->delete();
+
+            return ApiResponse::sendResponse([], 'Logout successful.');
+        } catch (\Exception $e) {
+            return ApiResponse::rollback('Logout failed', ['error' => $e->getMessage()], 500);
+        }
+    }
+
     /**
      * Reset user password using the reset code.
      *

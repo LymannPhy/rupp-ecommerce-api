@@ -9,6 +9,27 @@ use Exception;
 class ApiResponse
 {
     /**
+     * Send an error response without throwing an exception.
+     *
+     * @param string $message
+     * @param array $errors
+     * @param int $statusCode
+     * @return JsonResponse
+     */
+    public static function error(string $message = 'Error', array $errors = [], int $statusCode = 400): JsonResponse
+    {
+        return response()->json([
+            'status' => 'error',
+            'code' => $statusCode,
+            'message' => $message . ' ❌',
+            'icon' => '🚫',
+            'date' => now()->toDateTimeString(),
+            'errors' => $errors
+        ], $statusCode);
+    }
+    
+
+    /**
      * Send a standard API success response.
      *
      * @param mixed $data

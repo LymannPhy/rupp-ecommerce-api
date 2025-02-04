@@ -9,7 +9,7 @@ use App\Http\Responses\ApiResponse;
 
 class UserController extends Controller
 {
-    /**
+   /**
      * Load the currently authenticated user.
      *
      * @return \Illuminate\Http\JsonResponse
@@ -20,17 +20,18 @@ class UserController extends Controller
             $user = auth()->user();
 
             if (!$user) {
-                return ApiResponse::throw('Unauthorized', ['error' => 'User not authenticated'], 401);
+                return ApiResponse::error('Unauthorized ❌', ['error' => 'User not authenticated'], 401);
             }
 
-            return ApiResponse::sendResponse(new UserResource($user), 'Current user retrieved successfully.');
+            return ApiResponse::sendResponse(new UserResource($user), 'Current user retrieved successfully ✅');
         } catch (\Exception $e) {
-            return ApiResponse::throw('Failed to retrieve user', ['error' => $e->getMessage()], 500);
+            return ApiResponse::error('Failed to retrieve user 🔥', ['error' => $e->getMessage()], 500);
         }
     }
 
+
    /**
-     * Load all users (Admins Only).
+     * Load all users except admins (Admins Only).
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -44,12 +45,17 @@ class UserController extends Controller
                 return ApiResponse::throw('Forbidden', ['error' => 'You are not authorized to access this resource'], 403);
             }
 
-            $users = User::all();
+            // Fetch users excluding those with the 'admin' role
+            $users = User::whereDoesntHave('roles', function ($query) {
+                $query->where('name', 'admin');
+            })->get();
+
             return ApiResponse::sendResponse(UserResource::collection($users), 'Users retrieved successfully.');
         } catch (\Exception $e) {
             return ApiResponse::throw('Failed to retrieve users', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 
     /**
