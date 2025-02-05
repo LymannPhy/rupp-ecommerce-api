@@ -14,6 +14,7 @@ class Discount extends Model
         'uuid',
         'name',
         'description',
+        'image',
         'discount_percentage',
         'start_date',
         'end_date',

@@ -12,15 +12,15 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('discounts', function (Blueprint $table) {
+        Schema::create('coupons', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique()->default(Str::uuid());
-            $table->string('name'); 
-            $table->text('description')->nullable(); 
-            $table->string('image')->nullable(); 
+            $table->string('code')->unique(); 
             $table->decimal('discount_percentage', 5, 2)->nullable(); 
+            $table->integer('max_usage')->nullable(); 
+            $table->integer('user_limit')->nullable();
             $table->dateTime('start_date')->nullable(); 
-            $table->dateTime('end_date')->nullable();
+            $table->dateTime('end_date')->nullable(); 
             $table->boolean('is_active')->default(true); 
             $table->timestamps();
         });
@@ -31,6 +31,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('discounts');
+        Schema::dropIfExists('coupons');
     }
 };

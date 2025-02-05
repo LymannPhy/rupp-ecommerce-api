@@ -207,7 +207,6 @@ class AuthController extends Controller
         }
     }
 
-
     /**
      * Handle user login and generate access & refresh tokens.
      *
@@ -255,7 +254,8 @@ class AuthController extends Controller
                 'access_token' => $accessToken,
                 'refresh_token' => $refreshToken,
                 'token_type' => 'Bearer',
-            ], 'Login successful');
+            ], '🎉 Welcome back, ' . $user->name . '! You are now logged in 🚀');
+            
         } catch (ValidationException $e) {
             return ApiResponse::throw('Validation failed', $e->errors(), 422);
         } catch (\Exception $e) {

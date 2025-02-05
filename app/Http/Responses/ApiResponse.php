@@ -19,16 +19,14 @@ class ApiResponse
     public static function error(string $message = 'Error', array $errors = [], int $statusCode = 400): JsonResponse
     {
         return response()->json([
+            'date' => now()->toDateTimeString(),
             'status' => 'error',
             'code' => $statusCode,
-            'message' => $message . ' ❌',
-            'icon' => '🚫',
-            'date' => now()->toDateTimeString(),
+            'message' => $message . '❌',
             'errors' => $errors
         ], $statusCode);
     }
     
-
     /**
      * Send a standard API success response.
      *
@@ -40,8 +38,10 @@ class ApiResponse
     public static function sendResponse($data = [], string $message = 'Success', int $statusCode = 200): JsonResponse
     {
         return response()->json([
+            'date' => now()->toDateTimeString(),
             'status' => 'success',
-            'message' => $message,
+            'code' => $statusCode,
+            'message' => $message . '✅',
             'data' => $data
         ], $statusCode);
     }
@@ -58,8 +58,10 @@ class ApiResponse
     public static function throw(string $message = 'Error', array $errors = [], int $statusCode = 400): JsonResponse
     {
         throw new Exception(json_encode([
+            'date' => now()->toDateTimeString(),
             'status' => 'error',
-            'message' => $message,
+            'code' => $statusCode,
+            'message' => $message . '❌',
             'errors' => $errors
         ]), $statusCode);
     }

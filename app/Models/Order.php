@@ -33,4 +33,11 @@ class Order extends Model
     {
         return $this->hasMany(OrderItem::class);
     }
+
+    // Relationship: Order belongs to a Coupon
+    public function coupon()
+    {
+        return $this->belongsTo(Coupon::class);
+    }
+
 }

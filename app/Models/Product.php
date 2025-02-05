@@ -20,7 +20,6 @@ class Product extends Model
         'multi_images',
         'price',
         'stock',
-        'quantity',
         'glycemic_index',
         'is_preorder',
         'preorder_duration',
@@ -46,7 +45,6 @@ class Product extends Model
 
         static::creating(function ($product) {
             $product->uuid = Str::uuid();
-            $product->slug = Str::slug($product->name);
         });
     }
 
@@ -80,18 +78,5 @@ class Product extends Model
     public function wishlistItems()
     {
         return $this->hasMany(Wishlist::class);
-    }
-
-    // Accessor for Final Price (Handles Discount Calculation)
-    public function getFinalPriceAttribute()
-    {
-        if ($this->discount && $this->discount->is_valid) {
-            if ($this->discount->discount_percentage) {
-                return $this->price - ($this->price * $this->discount->discount_percentage / 100);
-            } elseif ($this->discount->discount_amount) {
-                return max(0, $this->price - $this->discount->discount_amount);
-            }
-        }
-        return $this->price;
     }
 }

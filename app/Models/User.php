@@ -59,20 +59,22 @@ class User extends Authenticatable
         });
     }
 
-    /**
-     * Get the roles associated with the user.
-     */
     public function roles()
     {
         return $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id'); 
     }
 
-    /**
-     * Check if user has a specific role.
-     */
     public function hasRole($role)
     {
         return $this->roles()->where('name', $role)->exists();
     }
+
+    public function coupons()
+    {
+        return $this->belongsToMany(Coupon::class, 'coupon_users')
+                    ->withPivot('usage_count')
+                    ->withTimestamps();
+    }
+
 
 }
