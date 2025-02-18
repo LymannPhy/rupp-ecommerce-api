@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Password Reset Code</title>
+    <title>Contact Response</title>
     <style>
         body {
             font-family: 'Nunito', sans-serif;
@@ -29,25 +29,22 @@
             <div style="width: 100%; height: 2px; background-color: #365CCE;"></div>
             <div style="text-align: center; width: 100%; margin-top: 15px;">
                 <div style="font-weight: bold; font-size: 25px;">
-                    Password Reset Code
+                    Response to Your Inquiry
                 </div>
             </div>
             <main style="text-align: start; padding: 20px;">
                 <p>Dear <strong>{{ $name }}</strong>,</p>
                 <p style="margin-top: 10px;">
-                    You have requested to reset your password. Please use the following code to reset your password:
+                    Thank you for reaching out to us! Here is our response to your inquiry:
                 </p>
                 <blockquote style="margin-top: 10px; padding: 10px; background-color: #f3f4f6; border-left: 4px solid #365CCE;">
-                    <h1>{{ $resetCode }}</h1>
+                    {{ $messageContent }}
                 </blockquote>
                 <p>
-                    This code will expire in 15 minutes.
+                    If you have any further questions, feel free to reply to this email.
                 </p>
                 <p>
-                    If you did not request this, please ignore this email.
-                </p>
-                <p>
-                    Best Regards, <br />
+                    Best Regard, <br />
                     <strong>CAM-O2 Team</strong>
                 </p>
             </main>
@@ -58,7 +55,7 @@
                             Get in touch
                         </h1>
                         <a href="tel:+855 92 838 609" style="color: #4b5563;">(+855) 92 838 609</a>
-                        <a href="mailto:cam-o2@gmail.com" style="color: #4b5563;">cam-o2@gmail.com</a>
+                        <a href="mailto:sales@infynno.com" style="color: #4b5563;">cam-o2@gmail.com</a>
                     </div>
                 </div>
                 <div style="background-color: #365cce; padding: 10px; color: #fff; text-align: center;">

@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Resources\CategoryResource;
 use Illuminate\Http\Request;
 use App\Models\Category;
 use App\Http\Responses\ApiResponse;

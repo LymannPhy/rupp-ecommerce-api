@@ -263,6 +263,7 @@ class AuthController extends Controller
         }
     }
 
+    
 
     /**
      * Register a new user and send a verification code via email.

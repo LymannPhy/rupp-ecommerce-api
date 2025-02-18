@@ -76,5 +76,16 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
+    public function bookmarks()
+    {
+        return $this->hasMany(Bookmark::class);
+    }
+
+    // Define the relationship between User and Feedback
+    public function feedbacks()
+    {
+        return $this->hasMany(Feedback::class);
+    }
+
 
 }

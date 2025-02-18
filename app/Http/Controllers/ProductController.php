@@ -10,14 +10,111 @@ use App\Models\Category;
 use App\Models\Discount;
 use App\Http\Responses\ApiResponse;
 use App\Helpers\PaginationHelper;
+use App\Models\Rating;
 
 class ProductController extends Controller
 {
     /**
-     * Retrieve product details by UUID.
+     * Get the top 10 latest created products.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getLatestProducts()
+    {
+        try {
+            // Fetch the latest 10 products that are not deleted
+            $latestProducts = Product::where('is_deleted', false)
+                ->orderByDesc('created_at') // Sort by newest first
+                ->limit(10) // Get top 10 latest
+                ->with(['category:id,name']) // Load category details
+                ->get();
+
+            // If no products are found
+            if ($latestProducts->isEmpty()) {
+                return ApiResponse::error('No products found', [], 404);
+            }
+
+            // Format response data
+            $responseData = $latestProducts->map(function ($product) {
+                return [
+                    'uuid' => $product->uuid,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'image' => $product->image,
+                    'multi_images' => $product->multi_images,
+                    'price' => $product->price,
+                    'stock' => $product->stock,
+                    'category' => $product->category->name ?? null,
+                    'is_preorder' => $product->is_preorder,
+                    'expiration_date' => $product->expiration_date,
+                    'created_at' => $product->created_at,
+                    'updated_at' => $product->updated_at,
+                ];
+            });
+
+            return ApiResponse::sendResponse($responseData, 'Top 10 latest products retrieved successfully');
+        } catch (\Exception $e) {
+            // Catch any exceptions and return detailed error message
+            return ApiResponse::error('An error occurred while fetching the products', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ], 500);
+        }
+    }
+
+
+     /**
+     * Get all discounted products with their details and discount percentage.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getDiscountedProducts()
+    {
+        // Fetch products that have an active discount
+        $discountedProducts = Product::whereNotNull('discount_id')
+            ->where('is_deleted', false)
+            ->whereHas('discount', function ($query) {
+                $query->where('is_active', true)
+                    ->whereDate('end_date', '>=', now()); // Only check end_date
+            })
+            ->with([
+                'discount:id,uuid,name,discount_percentage,start_date,end_date,is_active',
+                'category:id,name',
+            ])
+            ->get();
+
+
+        if ($discountedProducts->isEmpty()) {
+            return ApiResponse::error('No discounted products found', [], 404);
+        }
+
+        // Format response data
+        $responseData = $discountedProducts->map(function ($product) {
+            return [
+                'uuid' => $product->uuid,
+                'name' => $product->name,
+                'description' => $product->description,
+                'image' => $product->image,
+                'multi_images' => $product->multi_images,
+                'price' => $product->price,
+                'discount_percentage' => $product->discount->discount_percentage ?? 0,
+                'stock' => $product->stock,
+                'category' => $product->category->name ?? null,
+                'is_preorder' => $product->is_preorder,
+                'expiration_date' => $product->expiration_date,
+                'created_at' => $product->created_at,
+                'updated_at' => $product->updated_at,
+            ];
+        });
+
+        return ApiResponse::sendResponse($responseData, 'Discounted products retrieved successfully');
+    }
+
+    /**
+     * Retrieve product details by UUID along with related products and average rating.
      * 
-     * This method fetches a product's details, including its category and discount.
-     * It excludes soft-deleted products from the response.
+     * This method fetches a product's details, including its category, discount,
+     * related products in the same category, and average rating.
      *
      * @param string $uuid The UUID of the product.
      * @return \Illuminate\Http\JsonResponse
@@ -35,6 +132,16 @@ class ProductController extends Controller
             if (!$product) {
                 return ApiResponse::error('Product not found', [], 404);
             }
+
+            // Fetch related products in the same category, excluding the current product
+            $relatedProducts = Product::where('category_id', $product->category_id)
+                ->where('uuid', '!=', $uuid) // Exclude the current product
+                ->where('is_deleted', false)
+                ->limit(5) // Adjust the number of related products as needed
+                ->get(['uuid', 'name', 'image', 'price']);
+
+            // Calculate average rating
+            $averageRating = Rating::where('product_id', $product->id)->avg('rating') ?? 0;
 
             // Format response
             return ApiResponse::sendResponse([
@@ -55,13 +162,16 @@ class ProductController extends Controller
                 'health_benefits' => $product->health_benefits,
                 'color' => $product->color,
                 'size' => $product->size,
+                'average_rating' => round($averageRating, 2), // Rounded average rating
                 'created_at' => $product->created_at,
                 'updated_at' => $product->updated_at,
+                'related_products' => $relatedProducts, // Add related products
             ], 'Product details retrieved successfully!');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve product details', ['error' => $e->getMessage()], 500);
         }
     }
+
 
     /**
      * Soft delete a product by UUID.
@@ -172,20 +282,41 @@ class ProductController extends Controller
     }
 
     /**
-     * Retrieve all products with custom pagination metadata.
+     * Retrieve all products with custom pagination metadata, including average rating.
      *
      * @return \Illuminate\Http\JsonResponse
      */
     public function index(Request $request)
     {
         try {
-            // Fetch all products that are not deleted
-            $products = Product::where('is_deleted', false)
-                ->with(['category:id,uuid,name', 'discount:id,uuid,discount_percentage'])
-                ->paginate(10); // Optional pagination
+            $query = Product::where('is_deleted', false)
+                ->with(['category:id,uuid,name', 'discount:id,uuid,discount_percentage']);
 
-            // Format product data
+            // Apply search by product name
+            if ($request->has('search')) {
+                $query->where('name', 'LIKE', '%' . $request->search . '%');
+            }
+
+            // Apply category filter
+            if ($request->has('category_uuid')) {
+                $query->whereHas('category', function ($q) use ($request) {
+                    $q->where('uuid', $request->category_uuid);
+                });
+            }
+
+            // Apply sorting by price
+            if ($request->has('sort_price')) {
+                $sortOrder = $request->sort_price === 'desc' ? 'desc' : 'asc';
+                $query->orderBy('price', $sortOrder);
+            }
+
+            // Paginate results
+            $products = $query->paginate(10);
+
+            // Format product data with average rating
             $formattedProducts = $products->map(function ($product) {
+                $averageRating = Rating::where('product_id', $product->id)->avg('rating') ?? 0;
+
                 return [
                     'uuid' => $product->uuid,
                     'category_uuid' => $product->category->uuid ?? null,
@@ -204,6 +335,7 @@ class ProductController extends Controller
                     'health_benefits' => $product->health_benefits,
                     'color' => $product->color,
                     'size' => $product->size,
+                    'average_rating' => round($averageRating, 2),
                     'created_at' => $product->created_at,
                     'updated_at' => $product->updated_at,
                 ];
@@ -218,6 +350,7 @@ class ProductController extends Controller
             return ApiResponse::error('Failed to retrieve products', ['error' => $e->getMessage()], 500);
         }
     }
+
     /**
      * Store a newly created product using UUID for category and discount.
      *

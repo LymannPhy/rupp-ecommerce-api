@@ -3,11 +3,19 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\BlogController;
+use App\Http\Controllers\BookmarkController;
+use App\Http\Controllers\CartController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ContactUsController;
 use App\Http\Controllers\CouponController;
 use App\Http\Controllers\DiscountController;
+use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\ImageUploadController;
+use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\RatingController;
+use App\Http\Controllers\WishlistController;
 
 // Public Auth Routes
 Route::post('/register', [AuthController::class, 'register']);
@@ -23,6 +31,42 @@ Route::prefix('images')->group(function () {
     Route::post('/upload-multiple', [ImageUploadController::class, 'uploadMultiple']);
 });
 
+Route::prefix('blogs')->group(function () {
+    Route::get('/top', [BlogController::class, 'getTopBlogs']);
+    Route::get('/{uuid}', [BlogController::class, 'show']); 
+    Route::get('/', [BlogController::class, 'index']); 
+});
+
+Route::prefix('contact-us')->group(function () {
+    Route::post('/', [ContactUsController::class, 'store']); 
+});
+
+
+Route::prefix('products')->group(function () {
+    Route::get('/', [ProductController::class, 'index']);
+    Route::get('/discounted', [ProductController::class, 'getDiscountedProducts']);
+    Route::get('/latest-products', [ProductController::class, 'getLatestProducts']);
+    Route::get('/{uuid}', [ProductController::class, 'show']);
+
+});
+
+
+Route::prefix('carts')->group(function () {
+    Route::get('/items', [CartController::class, 'getCartItems']);
+    Route::post('/add', [CartController::class, 'addToCart']);
+    Route::delete('/remove', [CartController::class, 'removeFromCart']); 
+    Route::delete('/clear', [CartController::class, 'clearCart']);
+    Route::patch('/update-quantity', [CartController::class, 'updateCartQuantity']);
+});
+
+// Payment Routes
+Route::prefix('payments')->group(function () {
+    Route::post('orders/checkout', [PaymentController::class, 'checkout']); // Handles checkout
+    Route::get('/{payment}/status', [PaymentController::class, 'checkPayment']);
+    Route::post('/webhook', [PaymentController::class, 'webhook']);
+});
+
+
 
 Route::middleware(['auth:sanctum'])->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
@@ -30,18 +74,36 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::prefix('users')->group(function () {
         Route::get('/current-user', [UserController::class, 'getCurrentUser']);
         Route::post('/change-password', [UserController::class, 'changePassword']);
+        Route::patch('/update-profile', [UserController::class, 'updateProfile']);
     });
+
     Route::prefix('products')->group(function () {
-        Route::get('/', [ProductController::class, 'index']);
-        Route::get('/{uuid}', [ProductController::class, 'show']);
+        Route::post('/{uuid}/rate', [RatingController::class, 'rateProduct']); // Rate or update rating
+        Route::get('/{uuid}/ratings', [RatingController::class, 'getProductRatings']); // Get ratings & reviews
     });
+
+   
+
+    Route::prefix('wishlists')->group(function () {
+        Route::post('/add', [WishlistController::class, 'addToWishlist']); 
+        Route::get('/', [WishlistController::class, 'getWishlist']); 
+        Route::delete('/remove', [WishlistController::class, 'removeFromWishlist']);
+    });
+
+    Route::prefix('bookmarks')->group(function () {
+        Route::post('/', [BookmarkController::class, 'store']); 
+        Route::get('/', [BookmarkController::class, 'index']); 
+        Route::delete('/{uuid}', [BookmarkController::class, 'destroy']);
+    });
+
+    Route::prefix('feedbacks')->group(function () {
+        Route::post('/', [FeedbackController::class, 'storeFeedback']); 
+        Route::delete('/{uuid}', [FeedbackController::class, 'destroy']);
+    });
+
+    
 });
 
-
-// Protected Routes (Require Sanctum Authentication)
-Route::middleware(['auth:sanctum', 'role:user'])->group(function () {
-
-});
 
 Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
     Route::prefix('users')->group(function () {
@@ -73,6 +135,24 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::post('/', [ProductController::class, 'store']); 
         Route::put('/{uuid}', [ProductController::class, 'update']);
         Route::delete('/{uuid}', [ProductController::class, 'destroy']);
+    });
+
+    Route::prefix('blogs')->group(function () {
+        Route::post('/', [BlogController::class, 'store']); 
+        Route::put('/{uuid}', [BlogController::class, 'update']);
+        Route::delete('/{uuid}', [BlogController::class, 'destroy']);
+    });
+
+    Route::prefix('feedbacks')->group(function () {
+        Route::get('/', [FeedbackController::class, 'getAllFeedbacks']); 
+        Route::delete('/{uuid}', [FeedbackController::class, 'deleteFeedback']);
+        Route::get('/promoted-feedbacks', [FeedbackController::class, 'getPromotedFeedbacks']);
+        Route::patch('/{uuid}/status', [FeedbackController::class, 'updateFeedbackStatus']);
+    });
+
+    Route::prefix('contact-us')->group(function () {
+        Route::get('/', [ContactUsController::class, 'index']); 
+        Route::post('/respond/{uuid}', [ContactUsController::class, 'respondToUser']);
     });
     
 });

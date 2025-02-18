@@ -8,10 +8,69 @@ use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Helpers\PasswordHelper;
+use Illuminate\Support\Facades\Validator;
 
 
 class UserController extends Controller
 {
+    /**
+     * Partially update user profile information.
+     *
+     * This method allows users to update their profile details selectively.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateProfile(Request $request)
+    {
+        try {
+            $user = auth()->user();
+
+            if (!$user) {
+                return ApiResponse::error('Unauthorized ❌', ['error' => 'User not authenticated'], 401);
+            }
+
+            // Validate request data
+            $validator = Validator::make($request->all(), [
+                'name' => 'sometimes|required|string|max:255',
+                'avatar' => 'nullable|string|max:255',
+                'address' => 'nullable|string|max:500',
+                'phone_number' => 'nullable|string',
+                'bio' => 'nullable|string|max:1000',
+                'date_of_birth' => 'nullable|date|before:today',
+            ], [
+                'date_of_birth.before' => 'The date of birth must be a past date.',
+            ]);
+
+            if ($validator->fails()) {
+                return ApiResponse::error('Validation Error ❌', $validator->errors()->toArray(), 422);
+            }
+
+            // Update only provided fields
+            $user->update($request->only([
+                'name',
+                'avatar',
+                'address',
+                'phone_number',
+                'bio',
+                'date_of_birth'
+            ]));
+
+            return ApiResponse::sendResponse([
+                'uuid' => $user->uuid,
+                'name' => $user->name,
+                'avatar' => $user->avatar,
+                'address' => $user->address,
+                'phone_number' => $user->phone_number,
+                'bio' => $user->bio,
+                'date_of_birth' => $user->date_of_birth,
+                'updated_at' => now(),
+            ], 'Profile updated successfully!');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to update profile 🔥', ['error' => $e->getMessage()], 500);
+        }
+    }
+
     /**
      * Change the authenticated user's password.
      *
@@ -37,7 +96,7 @@ class UserController extends Controller
             // Check password conditions before updating
             $passwordCheck = PasswordHelper::checkPasswordConditions($user, $request->current_password, $request->new_password);
             if ($passwordCheck) {
-                return $passwordCheck; // Return error response if conditions fail
+                return $passwordCheck; 
             }
 
             // Update and hash the new password

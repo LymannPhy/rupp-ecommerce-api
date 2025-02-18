@@ -14,6 +14,11 @@ return [
     |
     */
 
+    'bakong' => [
+        'base_url' => env('BAKONG_BASE_URL'),
+        'token' => env('BAKONG_TOKEN'),
+    ],
+
     'mailgun' => [
         'domain' => env('MAILGUN_DOMAIN'),
         'secret' => env('MAILGUN_SECRET'),
