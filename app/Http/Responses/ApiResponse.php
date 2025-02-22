@@ -21,7 +21,7 @@ class ApiResponse
         return response()->json([
             'date' => now()->toDateTimeString(),
             'code' => $statusCode,
-            'message' => $message . '❌',
+            'message' => $message,
             'errors' => $errors
         ], $statusCode);
     }
@@ -39,7 +39,7 @@ class ApiResponse
         return response()->json([
             'date' => now()->toDateTimeString(),
             'code' => $statusCode,
-            'message' => $message . '✅',
+            'message' => $message,
             'data' => $data
         ], $statusCode);
     }
@@ -58,7 +58,7 @@ class ApiResponse
         throw new Exception(json_encode([
             'date' => now()->toDateTimeString(),
             'code' => $statusCode,
-            'message' => $message . '❌',
+            'message' => $message,
             'errors' => $errors
         ]), $statusCode);
     }

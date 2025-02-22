@@ -7,7 +7,8 @@ use App\Http\Resources\AuthResource;
 use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
+use Tymon\JWTAuth\Facades\JWTAuth;
+use Tymon\JWTAuth\Exceptions\JWTException;
 use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\VerificationCodeMail;
@@ -208,62 +209,141 @@ class AuthController extends Controller
     }
 
     /**
-     * Handle user login and generate access & refresh tokens.
+     * Handle user login and return JWT tokens along with user information.
      *
-     * @param Request $request
+     * This method authenticates the user using email and password, generates an access token,
+     * refresh token, and includes user details in the response. It uses the ApiResponse class
+     * for standardized API responses.
+     *
+     * @param Request $request The HTTP request containing 'email' and 'password'.
+     *
      * @return \Illuminate\Http\JsonResponse
+     * - **200 OK**: On successful authentication, returns:
+     *   - `access_token`: The JWT access token for authenticated requests.
+     *   - `refresh_token`: A token to refresh the access token upon expiry.
+     *   - `token_type`: Typically 'Bearer'.
+     *   - `expires_in`: Token expiry time in seconds.
+     *   - `user`: Authenticated user's information (username, email, avatar, role).
+     *
+     * - **401 Unauthorized**: If credentials are invalid.
+     * - **500 Internal Server Error**: If token creation fails due to a server error.
      */
     public function login(Request $request)
     {
+        $credentials = $request->only('email', 'password');
+
         try {
-            // Validate the login request
-            $credentials = $request->validate([
-                'email' => 'required|email',
-                'password' => 'required|string|min:6',
-            ]);
-
-            // Attempt authentication
-            if (!auth()->attempt($credentials)) {
-                return ApiResponse::throw('Unauthorized', ['error' => 'Invalid email or password'], 401);
+            // Attempt to authenticate the user with provided credentials
+            if (! $token = JWTAuth::attempt($credentials)) {
+                return ApiResponse::error('Invalid credentials', [], 401);
             }
 
-            // Retrieve authenticated user
+            // Get the authenticated user
             $user = auth()->user();
 
-            // Check if the user is blocked
-            if ($user->is_blocked) {
-                return ApiResponse::throw('Login failed', ['error' => 'Your account has been blocked.'], 403);
-            }
+            // Token Time To Live (in minutes), converted to seconds for expires_in
+            $ttl = config('jwt.ttl');
+            $expires_in = $ttl * 60;
 
-            // Check if the email is verified
-            if (!$user->is_verified) {
-                return ApiResponse::throw('Login failed', ['error' => 'Your email is not verified.'], 403);
-            }
+            // Generate refresh token with custom claim
+            $refresh_token = JWTAuth::claims(['refresh' => true])->fromUser($user);
 
-            // Retrieve the authenticated user
-            $user = auth()->user();
+            // Prepare user data to return
+            $userData = [
+                'username' => $user->name,
+                'email' => $user->email,
+                'avatar' => $user->avatar,
+                'role' => $user->roles()->pluck('name')->first(), // Assuming a single role
+            ];
 
-            // Generate Access Token (Short-lived)
-            $accessToken = $user->createToken('access_token', ['*'], now()->addMinutes(30))->plainTextToken;
-
-            // Generate Refresh Token (Longer-lived)
-            $refreshToken = $user->createToken('refresh_token', ['refresh'], now()->addDays(7))->plainTextToken;
-
-            return ApiResponse::sendResponse([
-                'user' => new AuthResource($user),
-                'access_token' => $accessToken,
-                'refresh_token' => $refreshToken,
+            // Prepare token data
+            $tokenData = [
+                'access_token' => $token,
+                'refresh_token' => $refresh_token,
                 'token_type' => 'Bearer',
-            ], '🎉 Welcome back, ' . $user->name . '! You are now logged in 🚀');
-            
-        } catch (ValidationException $e) {
-            return ApiResponse::throw('Validation failed', $e->errors(), 422);
-        } catch (\Exception $e) {
-            return ApiResponse::rollback('Login failed', ['error' => $e->getMessage()], 500);
+                'expires_in' => $expires_in,
+                'user' => $userData
+            ];
+
+            // Return success response using ApiResponse with a personalized, fun message
+            return ApiResponse::sendResponse($tokenData, "Welcome back, {$user->name}! 🎉 You're all set to conquer the world. 🌟", 200);
+
+
+        } catch (JWTException $e) {
+            // Handle token creation failure
+            return ApiResponse::error('Could not create token', ['exception' => $e->getMessage()], 500);
         }
     }
 
-    
+    /**
+     * Get the token array structure.
+     *
+     * @param  string $token
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    protected function respondWithToken($token)
+    {
+        return [
+            'access_token' => $token,
+            'token_type' => 'bearer',
+            'expires_in' => auth()->factory()->getTTL() * 60
+        ];
+    }
+
+
+    /**
+     * Refreshes the user's access token using a valid refresh token.
+     * 
+     * This method validates the provided refresh token, generates a new access token 
+     * and refresh token, and returns them along with the user's details 
+     * (name, email, avatar, role) and the expiration time.
+     * 
+     * @param \Illuminate\Http\Request $request The HTTP request containing the refresh token.
+     * 
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function refresh(Request $request)
+    {
+        $refreshToken = $request->input('refresh_token');
+
+        // Validate if refresh token is provided
+        if (!$refreshToken) {
+            return ApiResponse::error('Refresh token is required.', ['error' => 'No refresh token provided.'], 400);
+        }
+
+        try {
+            // Parse and validate the refresh token
+            $newToken = JWTAuth::setToken($refreshToken)->refresh();
+
+            // Get the user from the refresh token
+            $user = JWTAuth::setToken($refreshToken)->toUser();
+
+            if (!$user) {
+                return ApiResponse::error('Unauthorized.', ['error' => 'Invalid refresh token.'], 401);
+            }
+
+            return ApiResponse::sendResponse([
+                'user' => [
+                    'name' => $user->name,
+                    'email' => $user->email,
+                    'avatar' => $user->avatar ?? null,
+                    'role' => $user->roles()->pluck('name')->first() ?? 'user',
+                ],
+                'access_token' => $newToken,
+                'refresh_token' => JWTAuth::fromUser($user), // Issue new refresh token
+                'token_type' => 'bearer',
+                'expires_in' => auth()->factory()->getTTL() * 60,
+            ], 'Your access token has been refreshed! 🔄');
+
+        } catch (\Tymon\JWTAuth\Exceptions\TokenInvalidException $e) {
+            return ApiResponse::error('Invalid refresh token.', ['error' => $e->getMessage()], 401);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Could not refresh token.', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
 
     /**
      * Register a new user and send a verification code via email.

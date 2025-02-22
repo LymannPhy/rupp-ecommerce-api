@@ -12,18 +12,22 @@ use App\Http\Controllers\CouponController;
 use App\Http\Controllers\DiscountController;
 use App\Http\Controllers\FeedbackController;
 use App\Http\Controllers\ImageUploadController;
+use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RatingController;
 use App\Http\Controllers\WishlistController;
+use App\Http\Middleware\JwtMiddleware;
+
 
 // Public Auth Routes
-Route::post('/register', [AuthController::class, 'register']);
+Route::post('register', [AuthController::class, 'register']);
+Route::post('login', [AuthController::class, 'login']);
 Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
 Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationCode']);
-Route::post('/login', [AuthController::class, 'login']);
 Route::post('/request-password-reset', [AuthController::class, 'requestPasswordReset']);
 Route::post('/reset-password', [AuthController::class, 'resetPassword']);
+
 
 // Media Uploader(Not require user authentication)
 Route::prefix('images')->group(function () {
@@ -31,6 +35,8 @@ Route::prefix('images')->group(function () {
     Route::post('/upload-multiple', [ImageUploadController::class, 'uploadMultiple']);
 });
 
+
+// Public Route
 Route::prefix('blogs')->group(function () {
     Route::get('/top', [BlogController::class, 'getTopBlogs']);
     Route::get('/{uuid}', [BlogController::class, 'show']); 
@@ -41,35 +47,20 @@ Route::prefix('contact-us')->group(function () {
     Route::post('/', [ContactUsController::class, 'store']); 
 });
 
-
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::get('/discounted', [ProductController::class, 'getDiscountedProducts']);
     Route::get('/latest-products', [ProductController::class, 'getLatestProducts']);
     Route::get('/{uuid}', [ProductController::class, 'show']);
-
 });
 
 
-Route::prefix('carts')->group(function () {
-    Route::get('/items', [CartController::class, 'getCartItems']);
-    Route::post('/add', [CartController::class, 'addToCart']);
-    Route::delete('/remove', [CartController::class, 'removeFromCart']); 
-    Route::delete('/clear', [CartController::class, 'clearCart']);
-    Route::patch('/update-quantity', [CartController::class, 'updateCartQuantity']);
-});
+//Protected Route
+Route::middleware([JwtMiddleware::class])->group(function () {
+    //User Authentication
+    Route::post('logout', [AuthController::class, 'logout']);
+    Route::post('refresh', [AuthController::class, 'refresh']);
 
-// Payment Routes
-Route::prefix('payments')->group(function () {
-    Route::post('orders/checkout', [PaymentController::class, 'checkout']); // Handles checkout
-    Route::get('/{payment}/status', [PaymentController::class, 'checkPayment']);
-    Route::post('/webhook', [PaymentController::class, 'webhook']);
-});
-
-
-
-Route::middleware(['auth:sanctum'])->group(function () {
-    Route::post('/logout', [AuthController::class, 'logout']);
     // User CRUD Routes (Only authenticated users with role "user and admin")
     Route::prefix('users')->group(function () {
         Route::get('/current-user', [UserController::class, 'getCurrentUser']);
@@ -77,12 +68,25 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::patch('/update-profile', [UserController::class, 'updateProfile']);
     });
 
+    Route::prefix('orders')->group(function () {
+        Route::post('/checkout', [OrderController::class, 'checkout']);
+    });
+
+    Route::prefix('payments')->group(function () {
+        Route::post('/check-payment', [PaymentController::class, 'checkPayment']);
+    });
+
+    Route::prefix('carts')->group(function () {
+        Route::get('/items', [CartController::class, 'getCartItems']);
+        Route::post('/add', [CartController::class, 'addToCart']);
+        Route::delete('/remove', [CartController::class, 'removeFromCart']); 
+        Route::patch('/update-quantity', [CartController::class, 'updateCartQuantity']);
+    });
+
     Route::prefix('products')->group(function () {
         Route::post('/{uuid}/rate', [RatingController::class, 'rateProduct']); // Rate or update rating
         Route::get('/{uuid}/ratings', [RatingController::class, 'getProductRatings']); // Get ratings & reviews
     });
-
-   
 
     Route::prefix('wishlists')->group(function () {
         Route::post('/add', [WishlistController::class, 'addToWishlist']); 
@@ -101,11 +105,10 @@ Route::middleware(['auth:sanctum'])->group(function () {
         Route::delete('/{uuid}', [FeedbackController::class, 'destroy']);
     });
 
-    
 });
 
 
-Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
+Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     Route::prefix('users')->group(function () {
         Route::get('/', [UserController::class, 'getAllUsers']);
         Route::get('{uuid}', [UserController::class, 'getUserByUuid']);
@@ -117,6 +120,7 @@ Route::middleware(['auth:sanctum', 'role:admin'])->group(function () {
         Route::get('/{uuid}', [CategoryController::class, 'show']);
         Route::put('/{uuid}', [CategoryController::class, 'update']);
         Route::delete('/{uuid}', [CategoryController::class, 'destroy']);
+        Route::post('/subcategories', [CategoryController::class, 'createSubcategory']);
     });
 
     Route::prefix('discounts')->group(function () {

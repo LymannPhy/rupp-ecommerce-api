@@ -11,7 +11,7 @@ class Payment extends Model {
     use HasFactory;
 
     protected $fillable = [
-        'uuid', 'order_id', 'payment_method', 'amount', 'status', 'md5_hash', 'qr_code', 'user_id' 
+        'uuid', 'order_id', 'payment_method', 'amount', 'status', 'md5_hash', 'transaction_hash', 'from_account_id', 'to_account_id', 'qr_code', 'user_id' 
     ];
 
     protected static function boot() {

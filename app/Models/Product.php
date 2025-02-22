@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -28,7 +29,7 @@ class Product extends Model
         'color',
         'size',
         'expiration_date',
-        'is_deleted'
+        'is_deleted',
     ];
 
     protected $casts = [
@@ -48,7 +49,12 @@ class Product extends Model
         });
     }
 
-    // ========================== Relationships ==========================
+    public function getIsValidAttribute()
+    {
+        $now = Carbon::now();
+        return $this->is_active && (!$this->start_date || $now >= $this->start_date) && (!$this->end_date || $now <= $this->end_date);
+    }
+
 
     // Relationship: Product belongs to a Category
     public function category()
@@ -59,8 +65,10 @@ class Product extends Model
     // Relationship: Product belongs to a Discount
     public function discount()
     {
-        return $this->belongsTo(Discount::class);
+        return $this->belongsTo(Discount::class, 'discount_id', 'id');
     }
+
+
 
     // Relationship: Product is in many Order Items
     public function orderItems()

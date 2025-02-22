@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\PaginationHelper;
+use App\Models\Tag;
 
 class BlogController extends Controller
 {
@@ -60,7 +61,7 @@ class BlogController extends Controller
      */
     public function update(Request $request, $uuid)
     {
-        // Validate input
+        // ✅ Validate input including tags
         $request->validate([
             'title' => 'sometimes|string|max:255',
             'content' => 'sometimes|string',
@@ -68,28 +69,42 @@ class BlogController extends Controller
             'youtube_videos' => 'nullable|array',
             'youtube_videos.*' => 'url',
             'status' => 'nullable|in:draft,published',
+            'tags' => 'nullable|array', // ✅ Tags should be an array
+            'tags.*' => 'string|max:50' // ✅ Each tag should be a string
         ]);
 
-        // Find the blog by UUID
-        $blog = Blog::where('uuid', $uuid)->first();
+        // ✅ Find the blog by UUID
+        $blog = Blog::where('uuid', $uuid)->with('tags')->first();
 
         if (!$blog) {
             return ApiResponse::error('Blog not found', [], 404);
         }
 
-        // Begin database transaction
+        // ✅ Begin database transaction
         DB::beginTransaction();
 
         try {
-            // Update blog post
+            // ✅ Update blog post details
             $blog->update($request->only([
                 'title', 'content', 'image', 'youtube_videos', 'status'
             ]));
 
-            // Fetch admin user with UUID
+            // ✅ Process Tags if provided
+            if ($request->has('tags')) {
+                $tagIds = [];
+
+                foreach ($request->tags as $tagName) {
+                    $tag = Tag::firstOrCreate(['name' => $tagName]); // Find or create the tag
+                    $tagIds[] = $tag->id;
+                }
+
+                $blog->tags()->sync($tagIds); // ✅ Sync tags (add/remove as needed)
+            }
+
+            // ✅ Fetch admin user with UUID
             $admin = $blog->admin()->first(['uuid', 'name', 'email']);
 
-            // Commit transaction
+            // ✅ Commit transaction
             DB::commit();
 
             return ApiResponse::sendResponse([
@@ -102,11 +117,12 @@ class BlogController extends Controller
                 'published_at' => $blog->published_at,
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
+                'tags' => $blog->tags->pluck('name')->toArray(), // ✅ Return tags as an array
                 'admin' => $admin
             ], 'Blog updated successfully');
             
         } catch (\Exception $e) {
-            // Rollback transaction on failure
+            // ❌ Rollback transaction on failure
             DB::rollBack();
             return ApiResponse::error('Failed to update blog', ['error' => $e->getMessage()], 500);
         }
@@ -194,8 +210,8 @@ class BlogController extends Controller
      */
     public function show($uuid)
     {
-        // Find the blog by UUID
-        $blog = Blog::where('uuid', $uuid)->first();
+        // Find the blog by UUID with tags
+        $blog = Blog::where('uuid', $uuid)->with('tags')->first();
 
         if (!$blog) {
             return ApiResponse::error('Blog not found', [], 404);
@@ -218,9 +234,11 @@ class BlogController extends Controller
             'views' => $blog->views,
             'created_at' => $blog->created_at,
             'updated_at' => $blog->updated_at,
+            'tags' => $blog->tags->pluck('name')->toArray(), // ✅ Return tags as an array
             'admin' => $admin
         ], 'Blog details retrieved successfully');
     }
+
 
      /**
      * Store a new blog.
@@ -230,33 +248,47 @@ class BlogController extends Controller
      */
     public function store(Request $request)
     {
-        // Validate input
+        // ✅ Validate input including tags
         $request->validate([
             'title' => 'required|string|max:255',
             'content' => 'required|string',
-            'image' => 'nullable|string', 
+            'image' => 'nullable|string',
             'youtube_videos' => 'nullable|array',
-            'youtube_videos.*' => 'url'
+            'youtube_videos.*' => 'url',
+            'tags' => 'nullable|array', // Tags should be an array
+            'tags.*' => 'string|max:50' // Each tag should be a string
         ]);
 
-        // Initialize transaction
+        // ✅ Start a database transaction
         DB::beginTransaction();
 
         try {
-            // Create blog post
+            // ✅ Create a blog post
             $blog = Blog::create([
                 'title' => $request->title,
                 'content' => $request->content,
-                'image' => $request->image, 
+                'image' => $request->image,
                 'youtube_videos' => $request->youtube_videos ?? [],
                 'admin_id' => Auth::id(),
                 'status' => 'draft',
             ]);
 
-            // Fetch admin user with UUID
+            // ✅ Process Tags
+            if ($request->has('tags')) {
+                $tagIds = [];
+
+                foreach ($request->tags as $tagName) {
+                    $tag = Tag::firstOrCreate(['name' => $tagName]); // Find or create tag
+                    $tagIds[] = $tag->id;
+                }
+
+                $blog->tags()->sync($tagIds); // Attach tags to blog
+            }
+
+            // ✅ Fetch admin details
             $admin = $blog->admin()->first(['uuid', 'name', 'email']);
 
-            // Commit transaction
+            // ✅ Commit transaction
             DB::commit();
 
             return ApiResponse::sendResponse([
@@ -269,11 +301,12 @@ class BlogController extends Controller
                 'published_at' => $blog->published_at,
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
+                'tags' => $blog->tags->pluck('name')->toArray(), // ✅ Return tag names
                 'admin' => $admin
             ], 'Blog created successfully', 201);
 
         } catch (\Exception $e) {
-            // Rollback on failure
+            // ❌ Rollback on failure
             DB::rollBack();
             return ApiResponse::error('Failed to create blog', ['error' => $e->getMessage()], 500);
         }

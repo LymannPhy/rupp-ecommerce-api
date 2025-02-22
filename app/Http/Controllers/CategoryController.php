@@ -10,6 +10,51 @@ use Illuminate\Support\Facades\Validator;
 class CategoryController extends Controller
 {
     /**
+     * Create a subcategory under an existing category.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function createSubcategory(Request $request)
+    {
+        // Validate request data
+        $validator = Validator::make($request->all(), [
+            'name' => 'required|string|unique:categories,name|max:255',
+            'parent_uuid' => 'required|exists:categories,uuid', // Ensure parent exists
+        ]);
+
+        // If validation fails, return a 422 response
+        if ($validator->fails()) {
+            return ApiResponse::error('Validation Error', $validator->errors()->toArray(), 422);
+        }
+
+        try {
+            // Retrieve the parent category by UUID
+            $parentCategory = Category::where('uuid', $request->parent_uuid)->first();
+
+            // Create subcategory under parent category
+            $subcategory = Category::create([
+                'uuid' => (string) \Illuminate\Support\Str::uuid(), // Generate unique UUID
+                'name' => $request->name,
+                'parent_id' => $parentCategory->id, // Assign as a subcategory
+            ]);
+
+            // Return response with created subcategory data
+            return ApiResponse::sendResponse([
+                'uuid' => $subcategory->uuid,
+                'name' => $subcategory->name,
+                'parent_uuid' => $parentCategory->uuid,
+                'is_deleted' => $subcategory->is_deleted,
+                'created_at' => $subcategory->created_at,
+                'updated_at' => $subcategory->updated_at,
+            ], 'Subcategory created successfully 🎉', 201);
+        } catch (\Exception $e) {
+            // Handle unexpected errors
+            return ApiResponse::error('Failed to create subcategory', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
      * Delete a category by UUID.
      *
      * @param string $uuid

@@ -71,78 +71,85 @@ class CartController extends Controller
         }
     }
 
-    // /**
-    //  * Load all products in the authenticated user's cart.
-    //  *
-    //  * @return \Illuminate\Http\JsonResponse
-    //  */
-    // public function getCartItems()
-    // {
-    //     try {
-    //         $user = auth()->user();
 
-    //         if (!$user) {
-    //             return ApiResponse::error('Unauthorized ❌', ['error' => 'User not authenticated'], 401);
-    //         }
 
-    //         // Fetch cart items with product details
-    //         $cartItems = Cart::where('user_id', $user->id)
-    //             ->join('products', 'cart.product_id', '=', 'products.id')
-    //             ->select(
-    //                 'products.name as product_name',
-    //                 'products.image as product_image',
-    //                 'cart.quantity',
-    //                 'products.price'
-    //             )
-    //             ->get();
-
-    //         return ApiResponse::sendResponse($cartItems, 'Cart items retrieved successfully!');
-    //     } catch (\Exception $e) {
-    //         return ApiResponse::error('Failed to load cart items 🔥', ['error' => $e->getMessage()], 500);
-    //     }
-    // }
+    /**
+     * Retrieve all cart items with product details, including discounts.
+     *
+     * This method fetches cart items and calculates the discounted price
+     * per product based on the applied discount percentage. It also computes
+     * the total discount for each product and sums up the total cart value.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
     public function getCartItems()
     {
         try {
-            // Fetch cart items without user authentication
+            // Fetch cart items with product and discount details
             $cartItems = Cart::join('products', 'cart.product_id', '=', 'products.id')
+                ->leftJoin('discounts', 'products.discount_id', '=', 'discounts.id') // Join discounts
                 ->select(
+                    'products.uuid as product_uuid',
                     'products.name as product_name',
                     'products.image as product_image',
                     'cart.quantity',
-                    'products.price'
+                    'products.price',
+                    'discounts.discount_percentage',
+                    'discounts.is_active',
+                    'discounts.start_date',
+                    'discounts.end_date'
                 )
                 ->get();
 
-            return ApiResponse::sendResponse($cartItems, 'Cart items retrieved successfully!');
+            $totalCartValue = 0; // Total cart sum
+            $totalCartItems = 0; // ✅ Total number of items in the cart
+
+            // Process cart items
+            $responseData = $cartItems->map(function ($item) use (&$totalCartValue, &$totalCartItems) {
+                $discountedPrice = $item->price; // Default price
+                $totalDiscount = 0;
+
+                // Check if discount is valid
+                if ($item->discount_percentage > 0 && $item->is_active && now() >= $item->start_date && now() <= $item->end_date) {
+                    // Calculate discount amount per unit
+                    $totalDiscount = ($item->discount_percentage / 100) * $item->price;
+                    $discountedPrice = round($item->price - $totalDiscount, 2);
+                }
+
+                // ✅ Add to total cart item count
+                $totalCartItems += $item->quantity;
+
+                // Calculate total price for this product (price * quantity)
+                $totalProductPrice = round($discountedPrice * $item->quantity, 2);
+                $totalCartValue += $totalProductPrice; // Add to cart total
+
+                return [
+                    'product_uuid' => $item->product_uuid,
+                    'product_name' => $item->product_name,
+                    'product_image' => $item->product_image,
+                    'quantity' => $item->quantity,
+                    'original_price' => $item->price,
+                    'discount_percentage' => $item->discount_percentage ?? 0,
+                    'total_discount' => round($totalDiscount * $item->quantity, 2), 
+                    'discounted_price' => $discountedPrice, 
+                    'total_price' => $totalProductPrice,
+                ];
+            });
+
+            // Add total cart value and total items count to response
+            $response = [
+                'cart_items' => $responseData,
+                'total_cart_value' => round($totalCartValue, 2), // Sum of all total prices
+                'total_cart_items' => $totalCartItems, // ✅ Total items count
+            ];
+
+            return ApiResponse::sendResponse($response, 'Cart items retrieved successfully!');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to load cart items 🔥', ['error' => $e->getMessage()], 500);
         }
     }
 
 
-    /**
-     * Clear all products from the user's cart.
-     *
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function clearCart()
-    {
-        try {
-            $user = auth()->user();
-
-            if (!$user) {
-                return ApiResponse::error('Unauthorized ❌', ['error' => 'User not authenticated'], 401);
-            }
-
-            // Remove all items from cart
-            Cart::where('user_id', $user->id)->delete();
-
-            return ApiResponse::sendResponse([], 'Cart cleared successfully!');
-        } catch (\Exception $e) {
-            return ApiResponse::error('Failed to clear cart 🔥', ['error' => $e->getMessage()], 500);
-        }
-    }
 
     /**
      * Remove a single product from the authenticated user's cart.

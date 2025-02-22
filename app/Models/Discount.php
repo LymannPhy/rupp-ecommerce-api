@@ -30,8 +30,9 @@ class Discount extends Model
     // Relationship with Product
     public function products()
     {
-        return $this->hasMany(Product::class);
+        return $this->hasMany(Product::class, 'discount_id', 'id');
     }
+
 
     // Check if the discount is currently valid
     public function getIsValidAttribute()

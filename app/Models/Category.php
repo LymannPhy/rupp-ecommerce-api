@@ -10,7 +10,7 @@ class Category extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['uuid', 'name', 'is_deleted'];
+    protected $fillable = ['uuid', 'name', 'parent_id', 'is_deleted'];
 
     /**
      * Auto-generate UUID and Slug before creating a category.
@@ -28,5 +28,21 @@ class Category extends Model
     public function products()
     {
         return $this->hasMany(Product::class);
+    }
+
+    /**
+     * Get the parent category (if any).
+     */
+    public function parent()
+    {
+        return $this->belongsTo(Category::class, 'parent_id');
+    }
+
+    /**
+     * Get subcategories of this category.
+     */
+    public function subcategories()
+    {
+        return $this->hasMany(Category::class, 'parent_id');
     }
 }

@@ -36,4 +36,9 @@ class Blog extends Model
     {
         return $this->belongsTo(User::class, 'admin_id');
     }
+
+    public function tags()
+    {
+        return $this->belongsToMany(Tag::class, 'blog_tag');
+    }
 }
