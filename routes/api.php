@@ -15,7 +15,6 @@ use App\Http\Controllers\ImageUploadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\RatingController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Middleware\JwtMiddleware;
 
@@ -81,11 +80,6 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::post('/add', [CartController::class, 'addToCart']);
         Route::delete('/remove', [CartController::class, 'removeFromCart']); 
         Route::patch('/update-quantity', [CartController::class, 'updateCartQuantity']);
-    });
-
-    Route::prefix('products')->group(function () {
-        Route::post('/{uuid}/rate', [RatingController::class, 'rateProduct']); // Rate or update rating
-        Route::get('/{uuid}/ratings', [RatingController::class, 'getProductRatings']); // Get ratings & reviews
     });
 
     Route::prefix('wishlists')->group(function () {
