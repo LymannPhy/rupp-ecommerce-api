@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Response from CAM-O2</title>
+    <title>Thank You for Contacting Us</title>
     <style>
         body {
             margin: 0;
@@ -14,7 +14,7 @@
         }
 
         .email-container {
-            max-width: 600px;
+            max-width: 500px;
             margin: 40px auto;
             padding: 40px;
             background-color: #ffffff;
@@ -33,43 +33,35 @@
         }
 
         .content {
-            text-align: left;
+            text-align: center;
             color: #18181b;
         }
 
-        .greeting {
-            font-size: 18px;
-            color: #0284c7;
+        h1 {
+            font-size: 24px;
+            font-weight: 600;
             margin-bottom: 24px;
+            color: #0284c7;
         }
 
         .message {
             background-color: #f0f9ff;
             border-radius: 12px;
             padding: 32px;
-            margin: 24px 0;
+            margin: 32px 0;
             border: 1px solid #e0f2fe;
         }
 
         .message p {
-            margin: 0 0 16px 0;
+            margin: 0;
             color: #52525b;
             font-size: 16px;
             line-height: 1.8;
         }
 
-        .message p:last-child {
-            margin-bottom: 0;
-        }
-
-        .signature {
-            margin-top: 32px;
-            color: #52525b;
-        }
-
-        .signature-name {
-            font-weight: 600;
+        .highlight {
             color: #0284c7;
+            font-weight: 500;
         }
 
         .footer {
@@ -92,30 +84,22 @@
 <body>
     <div class="email-container">
         <div class="logo">
-            <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-Zw4NpBL7B93493zWF6bm0pJulLIdWU.png" alt="CAM-O2 Logo">
+            <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-Zw4NpBL7B93493zWF6bm0pJulLIdWU.png" alt="Company Logo">
         </div>
         
         <div class="content">
-            <div class="greeting">
-                Dear {{ $name }},
-            </div>
+            <h1>Thank you for reaching out!</h1>
             
             <div class="message">
-                <p>{{ $messageBody }}</p>
-                
-                <p>If you have any further questions or need additional information, please don't hesitate to reach out to us again.</p>
+                <p>We've received your message and will get back to you within <span class="highlight">24 hours</span>.</p>
             </div>
             
-            <div class="signature">
-                Best regards,<br>
-                <span class="signature-name">{{ $senderName }}</span><br>
-                CAM-O2 Team
-            </div>
+            <p>Have a wonderful day!</p>
         </div>
         
         <div class="footer">
             <p>CAM-O2<br>
-            Catalyzing sustainable development through equity, empowerment, and integrity.</p>
+            Empowering sustainable futures, fostering inclusive growth.</p>
         </div>
     </div>
 </body>

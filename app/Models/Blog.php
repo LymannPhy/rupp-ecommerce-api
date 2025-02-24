@@ -41,4 +41,14 @@ class Blog extends Model
     {
         return $this->belongsToMany(Tag::class, 'blog_tag');
     }
+
+    public function likes()
+    {
+        return $this->hasMany(BlogLike::class);
+    }
+
+    public function comments()
+    {
+        return $this->hasMany(BlogComment::class)->whereNull('parent_id')->orderBy('created_at', 'desc');
+    }
 }

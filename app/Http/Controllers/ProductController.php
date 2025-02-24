@@ -44,6 +44,13 @@ class ProductController extends Controller
                 // Calculate average rating (if applicable)
                 $averageRating = ProductFeedback::where('product_id', $product->id)->avg('rating') ?? 0;
 
+                // ✅ Decode multi_images column correctly
+                $allImages = json_decode($product->multi_images, true); // Decode JSON to array
+                if (!is_array($allImages)) {
+                    $allImages = []; // Ensure it defaults to an empty array
+                }
+                $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; // Get first image
+
                 return [
                     'uuid' => $product->uuid,
                     'category_name' => $product->category->name ?? null,
@@ -55,6 +62,8 @@ class ProductController extends Controller
                     'stock' => $product->stock,
                     'is_recommended' => $product->is_recommended,
                     'average_rating' => round($averageRating, 2),
+                    'single_image' => $singleImage, // ✅ Correct first image
+                    'images' => $allImages, // ✅ Remaining images
                     'created_at' => $product->created_at,
                     'updated_at' => $product->updated_at,
                 ];
@@ -69,7 +78,8 @@ class ProductController extends Controller
         }
     }
 
-     /**
+
+    /**
      * Get the top products based on orders, views, rating, and product feedback with filtering options.
      *
      * @param Request $request
@@ -137,7 +147,7 @@ class ProductController extends Controller
                 $discountedPrice = null;
                 $discountPercentage = 0;
 
-                // Validate if discount is active
+                // ✅ Handle Discount Calculation
                 if ($product->discount) {
                     $discountPercentage = (float) $product->discount->discount_percentage;
                     $isActive = (bool) $product->discount->is_active;
@@ -153,12 +163,19 @@ class ProductController extends Controller
                     }
                 }
 
+                // ✅ Process Images
+                $allImages = json_decode($product->multi_images, true);
+                if (!is_array($allImages)) {
+                    $allImages = []; // Ensure it's an array
+                }
+                $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; // Get first image
+
                 return [
                     'uuid'               => $product->uuid,
                     'name'               => $product->name,
                     'description'        => $product->description,
-                    'image'              => $product->image,
-                    'multi_images'       => $product->multi_images,
+                    'single_image'       => $singleImage,  
+                    'images'             => $allImages,  
                     'price'              => $product->price,
                     'discount_percentage'=> $discountPercentage,
                     'discounted_price'   => $discountedPrice,
@@ -185,6 +202,7 @@ class ProductController extends Controller
     }
 
 
+
     /**
      * Get all discounted products with their details and discount percentage.
      *
@@ -198,8 +216,8 @@ class ProductController extends Controller
                 ->where('is_deleted', false)
                 ->whereHas('discount', function ($query) {
                     $query->where('is_active', true)
-                        ->whereDate('start_date', '<=', now()) // Ensure discount has started
-                        ->whereDate('end_date', '>=', now()); // Ensure discount is still valid
+                        ->whereDate('start_date', '<=', now())
+                        ->whereDate('end_date', '>=', now());
                 })
                 ->with([
                     'discount:id,uuid,name,discount_percentage,start_date,end_date,is_active',
@@ -216,7 +234,7 @@ class ProductController extends Controller
                 $discountedPrice = null;
                 $discountPercentage = 0;
 
-                // Validate discount
+                // ✅ Handle Discount Calculation
                 if ($product->discount) {
                     $discountPercentage = (float) $product->discount->discount_percentage;
                     $isActive = (bool) $product->discount->is_active;
@@ -232,21 +250,28 @@ class ProductController extends Controller
                     }
                 }
 
+                // ✅ Process Images from `multi_images`
+                $allImages = json_decode($product->multi_images, true);
+                if (!is_array($allImages)) {
+                    $allImages = []; // Ensure it's an array
+                }
+                $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; // Get first image
+
                 return [
-                    'uuid' => $product->uuid,
-                    'name' => $product->name,
-                    'description' => $product->description,
-                    'image' => $product->image,
-                    'multi_images' => $product->multi_images,
-                    'price' => $product->price, // Original price
-                    'discount_percentage' => $discountPercentage,
-                    'discounted_price' => $discountedPrice, // Null if no valid discount
-                    'stock' => $product->stock,
-                    'category' => $product->category->name ?? null,
-                    'is_preorder' => $product->is_preorder,
-                    'expiration_date' => $product->expiration_date,
-                    'created_at' => $product->created_at,
-                    'updated_at' => $product->updated_at,
+                    'uuid'               => $product->uuid,
+                    'name'               => $product->name,
+                    'description'        => $product->description,
+                    'single_image'       => $singleImage, // ✅ First image extracted
+                    'images'             => $allImages, // ✅ Remaining images
+                    'price'              => $product->price,
+                    'discount_percentage'=> $discountPercentage,
+                    'discounted_price'   => $discountedPrice,
+                    'stock'              => $product->stock,
+                    'category'           => $product->category->name ?? null,
+                    'is_preorder'        => $product->is_preorder,
+                    'expiration_date'    => $product->expiration_date,
+                    'created_at'         => $product->created_at,
+                    'updated_at'         => $product->updated_at,
                 ];
             });
 
@@ -300,6 +325,13 @@ class ProductController extends Controller
                     $discountedPrice = round($product->price - $discountAmount, 2);
                 }
             }
+
+            // ✅ Process Images from `multi_images`
+            $allImages = json_decode($product->multi_images, true);
+            if (!is_array($allImages)) {
+                $allImages = []; // Ensure it's an array
+            }
+            $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; // Get first image
 
             // Fetch top 3 highest-rated feedbacks (excluding deleted ones)
             $topFeedbacks = ProductFeedback::where('product_id', $product->id)
@@ -355,13 +387,18 @@ class ProductController extends Controller
                             $similarDiscountedPrice = round($similarProduct->price - $discountAmount, 2);
                         }
                     }
+
+                    // ✅ Extract first image from `multi_images`
+                    $similarImages = json_decode($similarProduct->multi_images, true);
+                    $similarFirstImage = is_array($similarImages) && count($similarImages) > 0 ? $similarImages[0] : null;
+
                     return [
                         'uuid' => $similarProduct->uuid,
                         'name' => $similarProduct->name,
                         'price' => $similarProduct->price,
                         'discount_percentage' => $similarProduct->discount->discount_percentage ?? 0,
                         'discounted_price' => $similarDiscountedPrice,
-                        'image' => $similarProduct->image,
+                        'image' => $similarFirstImage, 
                     ];
                 });
             }
@@ -379,11 +416,11 @@ class ProductController extends Controller
                 'is_preorder' => $product->is_preorder,
                 'preorder_duration' => $product->preorder_duration,
                 'expiration_date' => $product->expiration_date,
-                'image' => $product->image,
-                'multi_images' => json_decode($product->multi_images, true) ?? [],
+                'single_image' => $singleImage, 
+                'images' => $allImages,
                 'color' => $product->color,
                 'size' => $product->size,
-                'views' => $product->views, // Updated view count
+                'views' => $product->views, 
                 'average_rating' => round($averageRating, 2),
                 'created_at' => $product->created_at,
                 'updated_at' => $product->updated_at,
@@ -394,6 +431,7 @@ class ProductController extends Controller
             return ApiResponse::error('Failed to retrieve product details', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 
     /**
@@ -450,10 +488,9 @@ class ProductController extends Controller
                 'price' => 'sometimes|required|numeric|min:0',
                 'stock' => 'sometimes|required|integer|min:0',
                 'glycemic_index' => 'nullable|numeric|min:0',
-                'is_preorder' => 'boolean',
+                'is_preorder' => 'sometimes|boolean',
                 'preorder_duration' => 'nullable|integer|min:1',
                 'expiration_date' => 'nullable|date',
-                'image' => 'nullable|string|max:255',
                 'multi_images' => 'nullable|array',
                 'multi_images.*' => 'string|max:255',
             ]);
@@ -466,6 +503,17 @@ class ProductController extends Controller
             $category = $request->category_uuid ? Category::where('uuid', $request->category_uuid)->first() : null;
             $discount = $request->discount_uuid ? Discount::where('uuid', $request->discount_uuid)->first() : null;
 
+            // Ensure category and discount exist before updating
+            if ($request->has('category_uuid') && !$category) {
+                return ApiResponse::error('Invalid category UUID', [], 400);
+            }
+            if ($request->has('discount_uuid') && !$discount) {
+                return ApiResponse::error('Invalid discount UUID', [], 400);
+            }
+
+            // Handle `multi_images` properly (convert to JSON format)
+            $multiImages = $request->has('multi_images') ? json_encode($request->multi_images) : $product->multi_images;
+
             // Update product details
             $product->update([
                 'category_id' => $category ? $category->id : $product->category_id,
@@ -474,12 +522,10 @@ class ProductController extends Controller
                 'description' => $request->description ?? $product->description,
                 'price' => $request->price ?? $product->price,
                 'stock' => $request->stock ?? $product->stock,
-                'glycemic_index' => $request->glycemic_index ?? $product->glycemic_index,
-                'is_preorder' => $request->is_preorder ?? $product->is_preorder,
+                'is_preorder' => filter_var($request->is_preorder, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $product->is_preorder,
                 'preorder_duration' => $request->preorder_duration ?? $product->preorder_duration,
                 'expiration_date' => $request->expiration_date ?? $product->expiration_date,
-                'image' => $request->image ?? $product->image,
-                'multi_images' => !empty($request->multi_images) ? json_encode($request->multi_images) : $product->multi_images,
+                'multi_images' => $multiImages,
             ]);
 
             return ApiResponse::sendResponse([
@@ -490,12 +536,11 @@ class ProductController extends Controller
                 'description' => $product->description,
                 'price' => $product->price,
                 'stock' => $product->stock,
-                'glycemic_index' => $product->glycemic_index,
                 'is_preorder' => $product->is_preorder,
                 'preorder_duration' => $product->preorder_duration,
                 'expiration_date' => $product->expiration_date,
-                'image' => $product->image,
-                'multi_images' => json_decode($product->multi_images, true),
+                'single_image' => $request->multi_images ? ($request->multi_images[0] ?? null) : (json_decode($product->multi_images, true)[0] ?? null),
+                'images' => json_decode($product->multi_images, true) ?? [],
                 'created_at' => $product->created_at,
                 'updated_at' => now(),
             ], 'Product updated successfully');
@@ -560,7 +605,6 @@ class ProductController extends Controller
                     'is_preorder' => $product->is_preorder,
                     'preorder_duration' => $product->preorder_duration,
                     'expiration_date' => $product->expiration_date,
-                    'image' => $product->image,
                     'multi_images' => json_decode($product->multi_images, true) ?? [],
                     'slogan' => $product->slogan,
                     'health_benefits' => $product->health_benefits,
@@ -603,10 +647,9 @@ class ProductController extends Controller
             'is_preorder' => 'boolean',
             'preorder_duration' => 'nullable|integer|min:1',
             'expiration_date' => 'nullable|date',
-            'image' => 'nullable|string|max:255',
             'multi_images' => 'nullable|array',
             'multi_images.*' => 'string|max:255',
-            'is_recommended' => 'boolean', // New validation rule for is_recommended
+            'is_recommended' => 'boolean',
         ]);
 
         if ($validator->fails()) {
@@ -640,7 +683,6 @@ class ProductController extends Controller
                 'is_preorder' => $request->is_preorder ?? false,
                 'preorder_duration' => $request->preorder_duration,
                 'expiration_date' => $request->expiration_date,
-                'image' => $request->image,
                 'multi_images' => !empty($request->multi_images) ? json_encode($request->multi_images) : null,
                 'is_recommended' => $request->is_recommended ?? false, 
             ]);
@@ -657,7 +699,6 @@ class ProductController extends Controller
                 'is_preorder' => $product->is_preorder,
                 'preorder_duration' => $product->preorder_duration,
                 'expiration_date' => $product->expiration_date,
-                'image' => $product->image,
                 'multi_images' => json_decode($product->multi_images, true),
                 'is_recommended' => $product->is_recommended, 
                 'created_at' => $product->created_at,

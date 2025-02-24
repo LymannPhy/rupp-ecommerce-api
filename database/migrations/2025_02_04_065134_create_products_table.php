@@ -19,8 +19,7 @@ return new class extends Migration
             $table->foreignId('category_id')->constrained()->onDelete('cascade');
             $table->foreignId('discount_id')->nullable()->constrained()->onDelete('set null');
             $table->string('name');
-            $table->text('description');
-            $table->string('image')->nullable(); 
+            $table->text('description'); 
             $table->json('multi_images')->nullable(); 
             $table->unsignedBigInteger('views')->default(0)->comment('Number of times the product has been viewed');
             $table->decimal('price', 10, 2); 

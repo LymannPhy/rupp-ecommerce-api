@@ -6,10 +6,12 @@ use App\Http\Responses\ApiResponse;
 use App\Models\ContactUs;
 use Illuminate\Http\Request;
 use App\Mail\ContactResponseMail;
+use App\Mail\ContactUsMail;
 use Illuminate\Support\Facades\Mail;
 
 class ContactUsController extends Controller
 {
+
     /**
      * Respond to a user's contact inquiry by sending a response email and updating the status.
      *
@@ -28,10 +30,13 @@ class ContactUsController extends Controller
                 'message' => 'required|string',
             ]);
 
-            // Send email
-            Mail::to($contact->email)->send(new ContactResponseMail($contact->name, $request->message));
+            // Get sender name (assume admin user is responding)
+            $senderName = auth()->user()->name ?? 'CAM-O2 Support';
 
-            // Update status to "reviewed"
+            // Send email
+            Mail::to($contact->email)->send(new ContactResponseMail($contact->name, $request->message, $senderName));
+
+            // Update status to "resolved"
             $contact->update(['status' => 'resolved']);
 
             return ApiResponse::sendResponse(
@@ -55,6 +60,7 @@ class ContactUsController extends Controller
      */
     public function store(Request $request)
     {
+        // Validate request
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
@@ -62,7 +68,19 @@ class ContactUsController extends Controller
             'message' => 'required|string',
         ]);
 
+        // Store contact request
         $contact = ContactUs::create($request->only(['name', 'email', 'phone', 'message']));
+
+        // Send email confirmation
+        try {
+            Mail::to($contact->email)->send(new ContactUsMail([
+                'name' => $contact->name,
+                'email' => $contact->email,
+                'message' => $contact->message
+            ]));
+        } catch (\Exception $e) {
+            return ApiResponse::error('Message sent but failed to send email', ['error' => $e->getMessage()], 500);
+        }
 
         return ApiResponse::sendResponse($contact, 'Your message has been sent successfully.', 201);
     }

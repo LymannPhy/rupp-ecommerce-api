@@ -98,5 +98,23 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasMany(Feedback::class);
     }
 
+    // 🔹 User-Blog Like Relationship (One-to-Many)
+    public function blogLikes()
+    {
+        return $this->hasMany(BlogLike::class);
+    }
+
+    // ✅ Check if User Liked a Blog Post
+    public function hasLikedBlog($blogId)
+    {
+        return $this->blogLikes()->where('blog_id', $blogId)->exists();
+    }
+
+    // 🔹 User-Comment Relationship (One-to-Many)
+    public function blogComments()
+    {
+        return $this->hasMany(BlogComment::class);
+    }
+
 
 }

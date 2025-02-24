@@ -17,12 +17,10 @@ class Product extends Model
         'discount_id',
         'name',
         'description',
-        'image',
         'multi_images',
         'views',
         'price',
         'stock',
-        'glycemic_index',
         'is_preorder',
         'preorder_duration',
         'color',
@@ -86,6 +84,7 @@ class Product extends Model
         return $this->hasMany(Wishlist::class);
     }
 
+    // Relationship: Product is in many ProductFeedback
     public function feedbacks()
     {
         return $this->hasMany(ProductFeedback::class, 'product_id');
