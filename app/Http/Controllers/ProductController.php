@@ -10,17 +10,72 @@ use App\Models\Category;
 use App\Models\Discount;
 use App\Http\Responses\ApiResponse;
 use App\Helpers\PaginationHelper;
-use App\Models\Rating;
+use App\Models\ProductFeedback;
+use Carbon\Carbon;
 
 class ProductController extends Controller
 {
     /**
-     * Get the latest products with filtering options.
+     * Retrieve recommended products sorted by creation date with pagination.
      *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getLatestProducts(Request $request)
+    public function recommended(Request $request)
+    {
+        try {
+            $query = Product::where('is_deleted', false)
+                ->where('is_recommended', true)
+                ->with(['category:id,uuid,name', 'discount:id,uuid,discount_percentage'])
+                ->orderBy('created_at', 'desc');
+
+            // Paginate results; default page size is 10 or use per_page from request
+            $products = $query->paginate($request->get('per_page', 10));
+
+            // Format each product data
+            $formattedProducts = $products->map(function ($product) {
+                // Calculate discounted price if a discount is set
+                $discountedPrice = null;
+                if ($product->discount && isset($product->discount->discount_percentage)) {
+                    $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
+                    $discountedPrice = round($product->price - $discountAmount, 2);
+                }
+                
+                // Calculate average rating (if applicable)
+                $averageRating = ProductFeedback::where('product_id', $product->id)->avg('rating') ?? 0;
+
+                return [
+                    'uuid' => $product->uuid,
+                    'category_name' => $product->category->name ?? null,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'discount_percentage' => $product->discount->discount_percentage ?? 0,
+                    'discounted_price' => $discountedPrice,
+                    'stock' => $product->stock,
+                    'is_recommended' => $product->is_recommended,
+                    'average_rating' => round($averageRating, 2),
+                    'created_at' => $product->created_at,
+                    'updated_at' => $product->updated_at,
+                ];
+            });
+
+            return ApiResponse::sendResponse(
+                \App\Helpers\PaginationHelper::formatPagination($products, $formattedProducts),
+                'Recommended products retrieved successfully'
+            );
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to retrieve recommended products', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+     /**
+     * Get the top products based on orders, views, rating, and product feedback with filtering options.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getPopularProducts(Request $request)
     {
         try {
             // Get filters from request
@@ -30,10 +85,12 @@ class ProductController extends Controller
             $maxPrice = $request->query('max_price');
             $search = $request->query('search');
 
-            // Build query
+            // Build query with eager loading and additional counts/averages
             $query = Product::where('is_deleted', false)
-                ->with(['category:id,name', 'discount']) // Load category and discount details
-                ->orderByDesc('created_at'); // Sort by newest first
+                ->with(['category:id,name', 'discount'])
+                ->withCount('orderItems')
+                ->withCount('feedbacks')
+                ->withAvg('feedbacks', 'rating');
 
             // 🔹 Filter by category
             if ($categoryUuid) {
@@ -64,15 +121,19 @@ class ProductController extends Controller
                 $query->where('name', 'LIKE', '%' . $search . '%');
             }
 
-            // Get the latest 10 products
-            $latestProducts = $query->limit(10)->get();
+            // Order by a composite popularity score:
+            // Composite Score = (orderItems_count * 3) + (views * 0.1) + (COALESCE(feedbacks_avg_rating, 0) * 2) + (feedbacks_count)
+            $query->orderByRaw("((order_items_count * 3) + (views * 0.1) + (COALESCE(feedbacks_avg_rating, 0) * 2) + (feedbacks_count)) DESC");
 
-            if ($latestProducts->isEmpty()) {
+            // Get the top 10 products
+            $topProducts = $query->limit(10)->get();
+
+            if ($topProducts->isEmpty()) {
                 return ApiResponse::error('No products found', [], 404);
             }
 
             // Format response data
-            $responseData = $latestProducts->map(function ($product) {
+            $responseData = $topProducts->map(function ($product) {
                 $discountedPrice = null;
                 $discountPercentage = 0;
 
@@ -93,24 +154,28 @@ class ProductController extends Controller
                 }
 
                 return [
-                    'uuid' => $product->uuid,
-                    'name' => $product->name,
-                    'description' => $product->description,
-                    'image' => $product->image,
-                    'multi_images' => $product->multi_images,
-                    'price' => $product->price, // Original price
-                    'discount_percentage' => $discountPercentage,
-                    'discounted_price' => $discountedPrice, // Null if no valid discount
-                    'stock' => $product->stock,
-                    'category' => $product->category->name ?? null,
-                    'is_preorder' => $product->is_preorder,
-                    'expiration_date' => $product->expiration_date,
-                    'created_at' => $product->created_at,
-                    'updated_at' => $product->updated_at,
+                    'uuid'               => $product->uuid,
+                    'name'               => $product->name,
+                    'description'        => $product->description,
+                    'image'              => $product->image,
+                    'multi_images'       => $product->multi_images,
+                    'price'              => $product->price,
+                    'discount_percentage'=> $discountPercentage,
+                    'discounted_price'   => $discountedPrice,
+                    'stock'              => $product->stock,
+                    'category'           => $product->category->name ?? null,
+                    'is_preorder'        => $product->is_preorder,
+                    'expiration_date'    => $product->expiration_date,
+                    'order_count'        => $product->order_items_count,
+                    'views'              => $product->views,
+                    'feedback_count'     => $product->feedbacks_count,
+                    'average_rating'     => round($product->feedbacks_avg_rating ?? 0, 2),
+                    'created_at'         => $product->created_at,
+                    'updated_at'         => $product->updated_at,
                 ];
             });
 
-            return ApiResponse::sendResponse($responseData, 'Filtered products retrieved successfully');
+            return ApiResponse::sendResponse($responseData, 'Top products retrieved successfully');
         } catch (\Exception $e) {
             return ApiResponse::error('An error occurred while fetching the products', [
                 'error' => $e->getMessage(),
@@ -196,10 +261,8 @@ class ProductController extends Controller
 
 
     /**
-     * Retrieve product details by UUID along with related products and average rating.
-     * 
-     * This method fetches a product's details, including its category, discount,
-     * related products in the same category, and average rating.
+     * Retrieve product details by UUID with discount price, top 3 highest-rated feedbacks, similar products,
+     * and increment the view count.
      *
      * @param string $uuid The UUID of the product.
      * @return \Illuminate\Http\JsonResponse
@@ -210,48 +273,123 @@ class ProductController extends Controller
             // Find product by UUID and exclude soft-deleted products
             $product = Product::where('uuid', $uuid)
                 ->where('is_deleted', false)
-                ->with(['category:id,uuid,name', 'discount:id,uuid,discount_percentage'])
+                ->with([
+                    'category:id,uuid,name', // Load category details
+                    'discount:id,uuid,discount_percentage,is_active,start_date,end_date' // Load discount details
+                ])
                 ->first();
 
-            // If product does not exist, return 404 error
+            // If product not found, return error
             if (!$product) {
                 return ApiResponse::error('Product not found', [], 404);
             }
+            
+            // Increase view count and refresh the product instance to reflect the updated views
+            $product->increment('views');
+            $product->refresh();
 
-            // Fetch related products in the same category, excluding the current product
-            $relatedProducts = Product::where('category_id', $product->category_id)
-                ->where('uuid', '!=', $uuid) // Exclude the current product
+            // Calculate discounted price
+            $discountedPrice = null;
+            if ($product->discount && $product->discount->is_active) {
+                $now = now();
+                $startDate = $product->discount->start_date ? Carbon::parse($product->discount->start_date) : null;
+                $endDate = $product->discount->end_date ? Carbon::parse($product->discount->end_date) : null;
+
+                if ((!$startDate || $now >= $startDate) && (!$endDate || $now <= $endDate)) {
+                    $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
+                    $discountedPrice = round($product->price - $discountAmount, 2);
+                }
+            }
+
+            // Fetch top 3 highest-rated feedbacks (excluding deleted ones)
+            $topFeedbacks = ProductFeedback::where('product_id', $product->id)
                 ->where('is_deleted', false)
-                ->limit(5) // Adjust the number of related products as needed
-                ->get(['uuid', 'name', 'image', 'price']);
+                ->with('user:id,uuid,name,avatar')
+                ->orderByDesc('rating')
+                ->orderByDesc('created_at')
+                ->limit(3)
+                ->get();
+
+            // Format product feedback data
+            $formattedFeedbacks = $topFeedbacks->map(function ($feedback) {
+                return [
+                    'uuid' => $feedback->uuid,
+                    'user' => [
+                        'uuid' => $feedback->user->uuid,
+                        'name' => $feedback->user->name,
+                        'avatar' => $feedback->user->avatar,
+                    ],
+                    'comment' => $feedback->comment,
+                    'rating' => $feedback->rating,
+                    'created_at' => $feedback->created_at,
+                ];
+            });
 
             // Calculate average rating
-            $averageRating = Rating::where('product_id', $product->id)->avg('rating') ?? 0;
+            $averageRating = ProductFeedback::where('product_id', $product->id)
+                ->where('is_deleted', false)
+                ->avg('rating') ?? 0;
 
-            // Format response
+            // Query similar products based on category (excluding the current product)
+            $similarProducts = [];
+            if ($product->category) {
+                $similarProductsQuery = Product::where('category_id', $product->category->id)
+                    ->where('uuid', '<>', $product->uuid)
+                    ->where('is_deleted', false)
+                    ->with([
+                        'discount:id,uuid,discount_percentage,is_active,start_date,end_date'
+                    ])
+                    ->limit(5)
+                    ->get();
+
+                // Format similar product data
+                $similarProducts = $similarProductsQuery->map(function ($similarProduct) {
+                    $similarDiscountedPrice = null;
+                    if ($similarProduct->discount && $similarProduct->discount->is_active) {
+                        $now = now();
+                        $startDate = $similarProduct->discount->start_date ? Carbon::parse($similarProduct->discount->start_date) : null;
+                        $endDate = $similarProduct->discount->end_date ? Carbon::parse($similarProduct->discount->end_date) : null;
+
+                        if ((!$startDate || $now >= $startDate) && (!$endDate || $now <= $endDate)) {
+                            $discountAmount = ($similarProduct->discount->discount_percentage / 100) * $similarProduct->price;
+                            $similarDiscountedPrice = round($similarProduct->price - $discountAmount, 2);
+                        }
+                    }
+                    return [
+                        'uuid' => $similarProduct->uuid,
+                        'name' => $similarProduct->name,
+                        'price' => $similarProduct->price,
+                        'discount_percentage' => $similarProduct->discount->discount_percentage ?? 0,
+                        'discounted_price' => $similarDiscountedPrice,
+                        'image' => $similarProduct->image,
+                    ];
+                });
+            }
+
+            // Format product response including similar products and the updated view count
             return ApiResponse::sendResponse([
                 'uuid' => $product->uuid,
-                'category_uuid' => $product->category->uuid ?? null,
-                'discount_uuid' => $product->discount->uuid ?? null,
                 'name' => $product->name,
+                'category_name' => $product->category->name ?? null,
                 'description' => $product->description,
                 'price' => $product->price,
+                'discount_percentage' => $product->discount->discount_percentage ?? 0,
+                'discounted_price' => $discountedPrice,
                 'stock' => $product->stock,
-                'glycemic_index' => $product->glycemic_index,
                 'is_preorder' => $product->is_preorder,
                 'preorder_duration' => $product->preorder_duration,
                 'expiration_date' => $product->expiration_date,
                 'image' => $product->image,
                 'multi_images' => json_decode($product->multi_images, true) ?? [],
-                'slogan' => $product->slogan,
-                'health_benefits' => $product->health_benefits,
                 'color' => $product->color,
                 'size' => $product->size,
-                'average_rating' => round($averageRating, 2), // Rounded average rating
+                'views' => $product->views, // Updated view count
+                'average_rating' => round($averageRating, 2),
                 'created_at' => $product->created_at,
                 'updated_at' => $product->updated_at,
-                'related_products' => $relatedProducts, // Add related products
-            ], 'Product details retrieved successfully!');
+                'feedbacks' => $formattedFeedbacks,
+                'similar_products' => $similarProducts,
+            ], 'Product details retrieved successfully with discount price, top feedbacks, and similar products ✅');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve product details', ['error' => $e->getMessage()], 500);
         }
@@ -367,7 +505,7 @@ class ProductController extends Controller
     }
 
     /**
-     * Retrieve all products with custom pagination metadata, including average rating.
+     * Retrieve all products with custom pagination metadata, including average rating and discount price.
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -398,17 +536,25 @@ class ProductController extends Controller
             // Paginate results
             $products = $query->paginate(10);
 
-            // Format product data with average rating
+            // Format product data with average rating and discount price calculation
             $formattedProducts = $products->map(function ($product) {
-                $averageRating = Rating::where('product_id', $product->id)->avg('rating') ?? 0;
+                $averageRating = ProductFeedback::where('product_id', $product->id)->avg('rating') ?? 0;
+
+                // Calculate discounted price if a discount exists
+                $discountedPrice = null;
+                if ($product->discount && isset($product->discount->discount_percentage)) {
+                    $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
+                    $discountedPrice = round($product->price - $discountAmount, 2);
+                }
 
                 return [
                     'uuid' => $product->uuid,
-                    'category_uuid' => $product->category->uuid ?? null,
-                    'discount_uuid' => $product->discount->uuid ?? null,
+                    'category_name' => $product->category->name ?? null,
                     'name' => $product->name,
                     'description' => $product->description,
                     'price' => $product->price,
+                    'discount_percentage' => $product->discount->discount_percentage ?? 0,
+                    'discounted_price' => $discountedPrice,
                     'stock' => $product->stock,
                     'glycemic_index' => $product->glycemic_index,
                     'is_preorder' => $product->is_preorder,
@@ -436,6 +582,7 @@ class ProductController extends Controller
         }
     }
 
+
     /**
      * Store a newly created product with category and subcategory support.
      *
@@ -459,6 +606,7 @@ class ProductController extends Controller
             'image' => 'nullable|string|max:255',
             'multi_images' => 'nullable|array',
             'multi_images.*' => 'string|max:255',
+            'is_recommended' => 'boolean', // New validation rule for is_recommended
         ]);
 
         if ($validator->fails()) {
@@ -483,7 +631,7 @@ class ProductController extends Controller
             // Create new product
             $product = Product::create([
                 'uuid' => Str::uuid(),
-                'category_id' => $subcategory ? $subcategory->id : $category->id, // 🔹 Assign either category or subcategory
+                'category_id' => $subcategory ? $subcategory->id : $category->id, 
                 'discount_id' => $discount ? $discount->id : null,
                 'name' => $request->name,
                 'description' => $request->description,
@@ -493,7 +641,8 @@ class ProductController extends Controller
                 'preorder_duration' => $request->preorder_duration,
                 'expiration_date' => $request->expiration_date,
                 'image' => $request->image,
-                'multi_images' => !empty($request->multi_images) ? json_encode($request->multi_images) : null, 
+                'multi_images' => !empty($request->multi_images) ? json_encode($request->multi_images) : null,
+                'is_recommended' => $request->is_recommended ?? false, 
             ]);
 
             return ApiResponse::sendResponse([
@@ -510,6 +659,7 @@ class ProductController extends Controller
                 'expiration_date' => $product->expiration_date,
                 'image' => $product->image,
                 'multi_images' => json_decode($product->multi_images, true),
+                'is_recommended' => $product->is_recommended, 
                 'created_at' => $product->created_at,
                 'updated_at' => $product->updated_at,
             ], 'Product created successfully 🎉', 201);
@@ -517,6 +667,7 @@ class ProductController extends Controller
             return ApiResponse::error('Failed to create product', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 }
 

@@ -19,15 +19,15 @@ class Product extends Model
         'description',
         'image',
         'multi_images',
+        'views',
         'price',
         'stock',
         'glycemic_index',
         'is_preorder',
         'preorder_duration',
-        'slogan',
-        'health_benefits',
         'color',
         'size',
+        'is_recommended',
         'expiration_date',
         'is_deleted',
     ];
@@ -68,8 +68,6 @@ class Product extends Model
         return $this->belongsTo(Discount::class, 'discount_id', 'id');
     }
 
-
-
     // Relationship: Product is in many Order Items
     public function orderItems()
     {
@@ -87,4 +85,10 @@ class Product extends Model
     {
         return $this->hasMany(Wishlist::class);
     }
+
+    public function feedbacks()
+    {
+        return $this->hasMany(ProductFeedback::class, 'product_id');
+    }
+
 }

@@ -51,7 +51,6 @@ class BlogController extends Controller
     }
 
 
-
     /**
      * Update a blog by UUID.
      *

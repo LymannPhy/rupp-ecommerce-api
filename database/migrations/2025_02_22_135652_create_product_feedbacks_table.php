@@ -20,6 +20,7 @@ return new class extends Migration {
             $table->integer('rating')->default(1)->comment('1 to 5 stars');
             $table->boolean('is_deleted')->default(false);
             $table->timestamps();
+            
         });
     }
 

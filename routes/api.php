@@ -15,6 +15,7 @@ use App\Http\Controllers\ImageUploadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
+use App\Http\Controllers\ProductFeedbackController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Middleware\JwtMiddleware;
 
@@ -49,7 +50,8 @@ Route::prefix('contact-us')->group(function () {
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
     Route::get('/discounted', [ProductController::class, 'getDiscountedProducts']);
-    Route::get('/latest-products', [ProductController::class, 'getLatestProducts']);
+    Route::get('/popular-products', [ProductController::class, 'getPopularProducts']);
+    Route::get('/recommended', [ProductController::class, 'recommended']);
     Route::get('/{uuid}', [ProductController::class, 'show']);
 });
 
@@ -98,6 +100,11 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::post('/', [FeedbackController::class, 'storeFeedback']); 
         Route::delete('/{uuid}', [FeedbackController::class, 'destroy']);
     });
+
+    Route::prefix('product-feedbacks')->group(function () {
+        Route::post('/submit', [ProductFeedbackController::class, 'store']);
+    });
+    
 
 });
 
@@ -152,6 +159,12 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::get('/', [ContactUsController::class, 'index']); 
         Route::post('/respond/{uuid}', [ContactUsController::class, 'respondToUser']);
     });
+
+    Route::prefix('product-feedbacks')->group(function () {
+        Route::get('/all', [ProductFeedbackController::class, 'getAllFeedbacks']);
+        Route::delete('/soft-delete/{uuid}', [ProductFeedbackController::class, 'softDelete']);
+    });
+    
     
 });
 
