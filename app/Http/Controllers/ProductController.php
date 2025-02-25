@@ -288,9 +288,6 @@ class ProductController extends Controller
     /**
      * Retrieve product details by UUID with discount price, top 3 highest-rated feedbacks, similar products,
      * and increment the view count.
-     *
-     * @param string $uuid The UUID of the product.
-     * @return \Illuminate\Http\JsonResponse
      */
     public function show($uuid)
     {
@@ -306,9 +303,9 @@ class ProductController extends Controller
 
             // If product not found, return error
             if (!$product) {
-                return ApiResponse::error('Product not found', [], 404);
+                return ApiResponse::error('Product not found 🚫', ['details' => 'The requested product does not exist.'], 404);
             }
-            
+
             // Increase view count and refresh the product instance to reflect the updated views
             $product->increment('views');
             $product->refresh();
@@ -326,12 +323,11 @@ class ProductController extends Controller
                 }
             }
 
-            // ✅ Process Images from `multi_images`
-            $allImages = json_decode($product->multi_images, true);
-            if (!is_array($allImages)) {
-                $allImages = []; // Ensure it's an array
+            // ✅ Process multi-images, ensure it's always an array
+            $multiImages = json_decode($product->multi_images, true);
+            if (!is_array($multiImages)) {
+                $multiImages = []; // Ensure it's always an array
             }
-            $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; // Get first image
 
             // Fetch top 3 highest-rated feedbacks (excluding deleted ones)
             $topFeedbacks = ProductFeedback::where('product_id', $product->id)
@@ -388,9 +384,13 @@ class ProductController extends Controller
                         }
                     }
 
-                    // ✅ Extract first image from `multi_images`
+                    // ✅ Extract the first image from `multi_images` for similar products
                     $similarImages = json_decode($similarProduct->multi_images, true);
-                    $similarFirstImage = is_array($similarImages) && count($similarImages) > 0 ? $similarImages[0] : null;
+                    if (!is_array($similarImages) || empty($similarImages)) {
+                        $similarFirstImage = null;
+                    } else {
+                        $similarFirstImage = $similarImages[0]; // Get only the first image
+                    }
 
                     return [
                         'uuid' => $similarProduct->uuid,
@@ -398,7 +398,7 @@ class ProductController extends Controller
                         'price' => $similarProduct->price,
                         'discount_percentage' => $similarProduct->discount->discount_percentage ?? 0,
                         'discounted_price' => $similarDiscountedPrice,
-                        'image' => $similarFirstImage, 
+                        'single_image' => $similarFirstImage, 
                     ];
                 });
             }
@@ -416,11 +416,10 @@ class ProductController extends Controller
                 'is_preorder' => $product->is_preorder,
                 'preorder_duration' => $product->preorder_duration,
                 'expiration_date' => $product->expiration_date,
-                'single_image' => $singleImage, 
-                'images' => $allImages,
+                'images' => $multiImages, // Only return multiple images
                 'color' => $product->color,
                 'size' => $product->size,
-                'views' => $product->views, 
+                'views' => $product->views,
                 'average_rating' => round($averageRating, 2),
                 'created_at' => $product->created_at,
                 'updated_at' => $product->updated_at,
@@ -428,11 +427,9 @@ class ProductController extends Controller
                 'similar_products' => $similarProducts,
             ], 'Product details retrieved successfully with discount price, top feedbacks, and similar products ✅');
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed to retrieve product details', ['error' => $e->getMessage()], 500);
+            return ApiResponse::error('Failed to retrieve product details 🤯', ['error' => $e->getMessage()], 500);
         }
     }
-
-
 
     /**
      * Soft delete a product by UUID.

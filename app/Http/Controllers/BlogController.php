@@ -417,13 +417,13 @@ class BlogController extends Controller
             'views' => $blog->views,
             'created_at' => $blog->created_at,
             'updated_at' => $blog->updated_at,
-            'tags' => $blog->tags->pluck('name')->toArray(), // ✅ Return tags as an array
+            'tags' => $blog->tags->pluck('name')->toArray(), 
             'admin' => $admin
         ], 'Blog details retrieved successfully');
     }
 
 
-     /**
+    /**
      * Store a new blog.
      *
      * @param Request $request
@@ -448,6 +448,7 @@ class BlogController extends Controller
         try {
             // ✅ Create a blog post
             $blog = Blog::create([
+                'uuid' => Str::uuid(), // Ensure UUID is set
                 'title' => $request->title,
                 'content' => $request->content,
                 'image' => $request->image,
@@ -461,7 +462,10 @@ class BlogController extends Controller
                 $tagIds = [];
 
                 foreach ($request->tags as $tagName) {
-                    $tag = Tag::firstOrCreate(['name' => $tagName]); // Find or create tag
+                    // ✅ Ensure UUID is set when creating a new tag
+                    $tag = Tag::firstOrCreate(['name' => $tagName], [
+                        'uuid' => Str::uuid() // Generate a new UUID only when creating a new tag
+                    ]);
                     $tagIds[] = $tag->id;
                 }
 
@@ -486,12 +490,13 @@ class BlogController extends Controller
                 'updated_at' => $blog->updated_at,
                 'tags' => $blog->tags->pluck('name')->toArray(), // ✅ Return tag names
                 'admin' => $admin
-            ], 'Blog created successfully', 201);
+            ], '🎉 Blog created successfully!', 201);
 
         } catch (\Exception $e) {
             // ❌ Rollback on failure
             DB::rollBack();
-            return ApiResponse::error('Failed to create blog', ['error' => $e->getMessage()], 500);
+            return ApiResponse::error('🚨 Failed to create blog!', ['error' => $e->getMessage()], 500);
         }
     }
+
 }
