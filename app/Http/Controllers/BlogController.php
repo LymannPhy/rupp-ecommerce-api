@@ -8,10 +8,194 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use App\Helpers\PaginationHelper;
+use App\Models\BlogComment;
+use App\Models\BlogLike;
 use App\Models\Tag;
+use Illuminate\Support\Str;
 
 class BlogController extends Controller
 {
+    /**
+     * Like/Unlike a Blog Post using UUID.
+     */
+    public function likeBlog(Request $request, $uuid)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return ApiResponse::error('Unauthorized ❌', ['details' => 'You must be logged in to like a blog post.'], 401);
+            }
+
+            $blog = Blog::where('uuid', $uuid)->first();
+            if (!$blog) {
+                return ApiResponse::error('Blog Not Found 🚫', ['details' => 'The blog post you are trying to like does not exist.'], 404);
+            }
+
+            $existingLike = BlogLike::where('user_id', $user->id)->where('blog_id', $blog->id)->first();
+
+            if ($existingLike) {
+                // Unlike if already liked
+                $existingLike->delete();
+
+                return ApiResponse::sendResponse([
+                    'likes_count' => $blog->likes()->count(),
+                ], 'Blog unliked successfully ❌', 200);
+            } else {
+                // Like the blog
+                BlogLike::create(['user_id' => $user->id, 'blog_id' => $blog->id]);
+
+                return ApiResponse::sendResponse([
+                    'likes_count' => $blog->likes()->count(),
+                ], 'Blog liked successfully ❤️', 200);
+            }
+        } catch (\Exception $e) {
+            return ApiResponse::error('Something went wrong 🤯', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
+    /**
+     * Add a comment or reply to a blog using UUID.
+     */
+    public function commentOnBlog(Request $request, $uuid)
+    {
+        try {
+            // Validate request
+            $request->validate([
+                'content' => 'required|string',
+                'parent_uuid' => 'nullable|exists:blog_comments,uuid' 
+            ]);
+
+            $user = Auth::user();
+            if (!$user) {
+                return ApiResponse::error('Unauthorized ❌', ['details' => 'You must be logged in to comment on this blog.'], 401);
+            }
+
+            $blog = Blog::where('uuid', $uuid)->first();
+            if (!$blog) {
+                return ApiResponse::error('Blog Not Found 🚫', ['details' => 'The blog you are trying to comment on does not exist.'], 404);
+            }
+
+            // Convert parent UUID to ID if replying to another comment
+            $parentComment = null;
+            if ($request->parent_uuid) {
+                $parentComment = BlogComment::where('uuid', $request->parent_uuid)->first();
+                if (!$parentComment) {
+                    return ApiResponse::error('Parent Comment Not Found 🗨️', ['details' => 'The comment you are trying to reply to does not exist.'], 404);
+                }
+            }
+
+            // Create the comment
+            $comment = BlogComment::create([
+                'uuid' => Str::uuid(),
+                'user_id' => $user->id,
+                'blog_id' => $blog->id,
+                'parent_id' => $parentComment ? $parentComment->id : null, // Support replies
+                'content' => $request->content,
+            ]);
+
+            return ApiResponse::sendResponse([
+                'comment' => [
+                    'uuid' => $comment->uuid,
+                    'user' => [
+                        'uuid' => $user->uuid,
+                        'name' => $user->name,
+                        'avatar' => $user->avatar,
+                    ],
+                    'content' => $comment->content,
+                    'created_at' => $comment->created_at,
+                    'parent_uuid' => $parentComment ? $parentComment->uuid : null,
+                ],
+            ], 'Comment added successfully 📝', 201);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Something went wrong 🤯', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
+    /**
+     * Get all comments for a specific blog using UUID.
+     */
+    public function getBlogComments($uuid)
+    {
+        try {
+            $blog = Blog::where('uuid', $uuid)->first();
+            if (!$blog) {
+                return ApiResponse::error('Blog Not Found 🚫', ['details' => 'The blog post you are trying to fetch comments for does not exist.'], 404);
+            }
+
+            // Fetch top-level comments (excluding replies)
+            $comments = BlogComment::where('blog_id', $blog->id)
+                ->whereNull('parent_id')
+                ->orderBy('created_at', 'asc')
+                ->with(['user:id,uuid,name,avatar', 'replies.user:id,uuid,name,avatar']) // Load user details & replies
+                ->get();
+
+            // Format comments with nested replies
+            $formattedComments = $comments->map(function ($comment) {
+                return $this->formatComment($comment);
+            });
+
+            return ApiResponse::sendResponse([
+                'blog_uuid' => $blog->uuid,
+                'total_comments' => $comments->count(),
+                'comments' => $formattedComments,
+            ], 'Blog comments retrieved successfully 🗨️', 200);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Something went wrong 🤯', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Recursively format a comment with nested replies.
+     */
+    private function formatComment($comment)
+    {
+        return [
+            'uuid' => $comment->uuid,
+            'user' => [
+                'uuid' => $comment->user->uuid ?? null,
+                'name' => $comment->user->name ?? 'Unknown User',
+                'avatar' => $comment->user->avatar ?? null,
+            ],
+            'content' => $comment->content,
+            'created_at' => $comment->created_at,
+            'replies' => $comment->replies->map(function ($reply) {
+                return $this->formatComment($reply); 
+            }),
+        ];
+    }
+
+
+    /**
+     * Delete a comment using UUID (Only owner or admin).
+     */
+    public function deleteComment($uuid)
+    {
+        try {
+            $user = Auth::user();
+            if (!$user) {
+                return ApiResponse::error('Unauthorized ❌', ['details' => 'You must be logged in to delete a comment.'], 401);
+            }
+
+            $comment = BlogComment::where('uuid', $uuid)->first();
+            if (!$comment) {
+                return ApiResponse::error('Comment Not Found 🚫', ['details' => 'The comment you are trying to delete does not exist.'], 404);
+            }
+
+            // Ensure only the comment owner or an admin can delete it
+            if ($comment->user_id !== $user->id && !$user->hasRole('admin')) {
+                return ApiResponse::error('Forbidden ❌', ['details' => 'You do not have permission to delete this comment.'], 403);
+            }
+
+            $comment->delete();
+            return ApiResponse::sendResponse(null, 'Comment deleted successfully 🗑️', 200);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Something went wrong 🤯', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
     /**
      * Get the top 10 blogs with the most views.
      *

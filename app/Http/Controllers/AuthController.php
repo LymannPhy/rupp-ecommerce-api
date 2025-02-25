@@ -361,12 +361,12 @@ class AuthController extends Controller
 
             // Check if email is already registered
             if (User::where('email', $validated['email'])->exists()) {
-                return ApiResponse::throw('Registration failed', ['email' => 'Email is already registered'], 409);
+                return ApiResponse::error('Registration failed', ['email' => 'Email is already registered'], 409);
             }
 
-            // Generate verification code and expiration time
+            // Generate verification code
             $verificationCode = rand(100000, 999999);
-            $verificationExpiration = now()->addMinutes(10); // Expires in 10 minutes
+            $verificationExpiration = now()->addMinutes(10);
 
             // Create user
             $user = User::create([
@@ -378,35 +378,26 @@ class AuthController extends Controller
                 'verification_code_expiration' => $verificationExpiration,
             ]);
 
-            // Assign default "user" role
+            // Assign "user" role
             $userRole = Role::where('name', 'user')->first();
-
             if (!$userRole) {
                 $userRole = Role::create(['name' => 'user']);
             }
+            $user->roles()->sync([$userRole->id]);
 
-            $user->roles()->sync([$userRole->id]); // Attach "user" role
-
-            // Send verification code via email
+            // Send verification email
             Mail::to($user->email)->send(new VerificationCodeMail($user->name, $verificationCode));
 
             DB::commit();
 
-            return response()->json([
-                'status' => 'success',
-                'message' => 'User registered successfully. Please check your email for the verification code.',
-                'data' => [
-                    'user' => new AuthResource($user),
-                    'token_type' => 'Bearer',
-                ]
-            ], 201);
+            return ApiResponse::sendResponse([
+                'user' => new AuthResource($user),
+                'token_type' => 'Bearer',
+            ], 'User registered successfully. Please check your email for the verification code.', 201);
         } catch (\Exception $e) {
             DB::rollBack();
-            return response()->json([
-                'status' => 'error',
-                'message' => 'User registration failed',
-                'error' => $e->getMessage(),
-            ], 500);
+            return ApiResponse::error('User registration failed', ['error' => $e->getMessage()], 500);
         }
     }
+
 }

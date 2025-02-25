@@ -104,8 +104,15 @@ Route::middleware([JwtMiddleware::class])->group(function () {
     Route::prefix('product-feedbacks')->group(function () {
         Route::post('/submit', [ProductFeedbackController::class, 'store']);
     });
-    
 
+    Route::prefix('blogs')->group(function () { 
+        Route::post('/{uuid}/like', [BlogController::class, 'likeBlog']); 
+        Route::post('/{uuid}/comment', [BlogController::class, 'commentOnBlog']);
+        Route::get('/{uuid}/comments', [BlogController::class, 'getBlogComments']);
+        Route::delete('/comment/{uuid}', [BlogController::class, 'deleteComment']);
+    });
+    
+    
 });
 
 
