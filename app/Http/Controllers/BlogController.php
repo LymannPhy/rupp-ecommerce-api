@@ -438,8 +438,8 @@ class BlogController extends Controller
             'image' => 'nullable|string',
             'youtube_videos' => 'nullable|array',
             'youtube_videos.*' => 'url',
-            'tags' => 'nullable|array', // Tags should be an array
-            'tags.*' => 'string|max:50' // Each tag should be a string
+            'tags' => 'nullable|array', 
+            'tags.*' => 'string|max:50' 
         ]);
 
         // ✅ Start a database transaction
@@ -448,7 +448,7 @@ class BlogController extends Controller
         try {
             // ✅ Create a blog post
             $blog = Blog::create([
-                'uuid' => Str::uuid(), // Ensure UUID is set
+                'uuid' => Str::uuid(),
                 'title' => $request->title,
                 'content' => $request->content,
                 'image' => $request->image,
@@ -464,12 +464,12 @@ class BlogController extends Controller
                 foreach ($request->tags as $tagName) {
                     // ✅ Ensure UUID is set when creating a new tag
                     $tag = Tag::firstOrCreate(['name' => $tagName], [
-                        'uuid' => Str::uuid() // Generate a new UUID only when creating a new tag
+                        'uuid' => Str::uuid() 
                     ]);
                     $tagIds[] = $tag->id;
                 }
 
-                $blog->tags()->sync($tagIds); // Attach tags to blog
+                $blog->tags()->sync($tagIds); 
             }
 
             // ✅ Fetch admin details
@@ -488,12 +488,11 @@ class BlogController extends Controller
                 'published_at' => $blog->published_at,
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
-                'tags' => $blog->tags->pluck('name')->toArray(), // ✅ Return tag names
+                'tags' => $blog->tags->pluck('name')->toArray(), 
                 'admin' => $admin
             ], '🎉 Blog created successfully!', 201);
 
         } catch (\Exception $e) {
-            // ❌ Rollback on failure
             DB::rollBack();
             return ApiResponse::error('🚨 Failed to create blog!', ['error' => $e->getMessage()], 500);
         }
