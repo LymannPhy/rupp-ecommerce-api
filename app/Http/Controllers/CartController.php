@@ -72,13 +72,8 @@ class CartController extends Controller
     }
 
 
-
     /**
-     * Retrieve all cart items with product details, including discounts.
-     *
-     * This method fetches cart items and calculates the discounted price
-     * per product based on the applied discount percentage. It also computes
-     * the total discount for each product and sums up the total cart value.
+     * Retrieve all cart items with product details, including total items and total cart value.
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -91,7 +86,7 @@ class CartController extends Controller
                 ->select(
                     'products.uuid as product_uuid',
                     'products.name as product_name',
-                    'products.image as product_image',
+                    'products.multi_images', // ✅ Fetch multi_images (JSON)
                     'cart.quantity',
                     'products.price',
                     'discounts.discount_percentage',
@@ -101,53 +96,63 @@ class CartController extends Controller
                 )
                 ->get();
 
-            $totalCartValue = 0; // Total cart sum
-            $totalCartItems = 0; // ✅ Total number of items in the cart
+            // Initialize totals
+            $totalCartValue = 0;
+            $totalCartItems = 0;
 
             // Process cart items
-            $responseData = $cartItems->map(function ($item) use (&$totalCartValue, &$totalCartItems) {
-                $discountedPrice = $item->price; // Default price
-                $totalDiscount = 0;
-
-                // Check if discount is valid
-                if ($item->discount_percentage > 0 && $item->is_active && now() >= $item->start_date && now() <= $item->end_date) {
-                    // Calculate discount amount per unit
-                    $totalDiscount = ($item->discount_percentage / 100) * $item->price;
-                    $discountedPrice = round($item->price - $totalDiscount, 2);
+            $formattedCartItems = $cartItems->map(function ($item) use (&$totalCartValue, &$totalCartItems) {
+                // ✅ Decode multi_images correctly, handling double encoding issue
+                $allImages = json_decode($item->multi_images, true);
+                
+                if (is_string($allImages)) {
+                    $allImages = json_decode(stripslashes($allImages), true);
                 }
 
-                // ✅ Add to total cart item count
-                $totalCartItems += $item->quantity;
+                // Ensure it's an array
+                if (!is_array($allImages)) {
+                    $allImages = [];
+                }
 
-                // Calculate total price for this product (price * quantity)
-                $totalProductPrice = round($discountedPrice * $item->quantity, 2);
-                $totalCartValue += $totalProductPrice; // Add to cart total
+                // ✅ Extract first image correctly
+                $singleImage = count($allImages) > 0 ? $allImages[0] : null;
+
+                // ✅ Calculate discounted price
+                $discountedPrice = $item->price;
+                if (
+                    $item->discount_percentage > 0 &&
+                    $item->is_active &&
+                    now() >= $item->start_date &&
+                    now() <= $item->end_date
+                ) {
+                    $discountedPrice = round($item->price - ($item->discount_percentage / 100) * $item->price, 2);
+                }
+
+                // ✅ Update total cart values
+                $totalCartItems += $item->quantity;
+                $totalCartValue += $discountedPrice * $item->quantity;
 
                 return [
-                    'product_uuid' => $item->product_uuid,
-                    'product_name' => $item->product_name,
-                    'product_image' => $item->product_image,
+                    'uuid' => $item->product_uuid,
+                    'name' => $item->product_name,
+                    'image' => $singleImage, // ✅ Correctly extracted first image
                     'quantity' => $item->quantity,
                     'original_price' => $item->price,
-                    'discount_percentage' => $item->discount_percentage ?? 0,
-                    'total_discount' => round($totalDiscount * $item->quantity, 2), 
-                    'discounted_price' => $discountedPrice, 
-                    'total_price' => $totalProductPrice,
+                    'discounted_price' => $discountedPrice,
                 ];
             });
 
-            // Add total cart value and total items count to response
-            $response = [
-                'cart_items' => $responseData,
-                'total_cart_value' => round($totalCartValue, 2), // Sum of all total prices
-                'total_cart_items' => $totalCartItems, // ✅ Total items count
-            ];
+            return ApiResponse::sendResponse([
+                'cart_items' => $formattedCartItems,
+                'total_cart_items' => $totalCartItems, // ✅ Total quantity of all items
+                'total_cart_value' => round($totalCartValue, 2) // ✅ Sum of all discounted prices
+            ], 'Cart items retrieved successfully! 🛒');
 
-            return ApiResponse::sendResponse($response, 'Cart items retrieved successfully!');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to load cart items 🔥', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 
 

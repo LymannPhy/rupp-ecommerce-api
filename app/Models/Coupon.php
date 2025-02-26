@@ -30,7 +30,6 @@ class Coupon extends Model
                     ->withTimestamps();
     }
 
-
     /**
      * Check if the coupon is valid (active and within the date range).
      *

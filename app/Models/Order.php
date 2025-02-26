@@ -15,6 +15,8 @@ class Order extends Model
         'uuid',
         'user_id',
         'total_price',
+        'delivery_price',
+        'delivery_date',
         'status'
     ];
 
@@ -41,12 +43,6 @@ class Order extends Model
         return $this->belongsTo(User::class);
     }
 
-    // Relationship: Order has many Order Items
-    public function orderItems()
-    {
-        return $this->hasMany(OrderItem::class);
-    }
-
     // Relationship: Order belongs to a Coupon
     public function coupon()
     {
@@ -60,5 +56,13 @@ class Order extends Model
     public function details()
     {
         return $this->hasOne(OrderDetail::class);
+    }
+
+    /**
+     * Relationship: Order has many OrderItems.
+     */
+    public function orderItems()
+    {
+        return $this->hasMany(OrderItem::class);
     }
 }

@@ -66,12 +66,6 @@ class Product extends Model
         return $this->belongsTo(Discount::class, 'discount_id', 'id');
     }
 
-    // Relationship: Product is in many Order Items
-    public function orderItems()
-    {
-        return $this->hasMany(OrderItem::class);
-    }
-
     // Relationship: Product is in many Carts
     public function cartItems()
     {

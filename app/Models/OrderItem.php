@@ -14,21 +14,16 @@ class OrderItem extends Model
         'product_id',
         'quantity',
         'price',
-        'subtotal'
+        'discounted_price',
     ];
 
-    protected $casts = [
-        'price' => 'decimal:2',
-        'subtotal' => 'decimal:2'
-    ];
-
-    // Relationship: Order Item belongs to an Order
+    // Relationship: OrderItem belongs to Order
     public function order()
     {
         return $this->belongsTo(Order::class);
     }
 
-    // Relationship: Order Item belongs to a Product
+    // Relationship: OrderItem belongs to Product
     public function product()
     {
         return $this->belongsTo(Product::class);

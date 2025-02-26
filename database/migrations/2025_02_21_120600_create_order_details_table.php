@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('email')->nullable();
             $table->string('phone_number')->nullable();
             $table->text('current_address'); 
-            $table->string('google_map_link')->nullable(); 
+            $table->text('google_map_link')->nullable(); 
             $table->text('remarks')->nullable(); 
             $table->timestamps();
         });

@@ -668,6 +668,14 @@ class ProductController extends Controller
             // Retrieve discount if provided
             $discount = $request->discount_uuid ? Discount::where('uuid', $request->discount_uuid)->first() : null;
 
+            // ✅ **Clean and store `multi_images` correctly**
+            $multiImages = $request->multi_images ?? [];
+            if (!empty($multiImages)) {
+                $multiImages = array_map(function ($image) {
+                    return stripslashes(trim($image));
+                }, $multiImages);
+            }
+
             // Create new product
             $product = Product::create([
                 'uuid' => Str::uuid(),
@@ -680,7 +688,7 @@ class ProductController extends Controller
                 'is_preorder' => $request->is_preorder ?? false,
                 'preorder_duration' => $request->preorder_duration,
                 'expiration_date' => $request->expiration_date,
-                'multi_images' => !empty($request->multi_images) ? json_encode($request->multi_images) : null,
+                'multi_images' => json_encode($multiImages), // ✅ Cleaned JSON
                 'is_recommended' => $request->is_recommended ?? false, 
             ]);
 
@@ -696,11 +704,12 @@ class ProductController extends Controller
                 'is_preorder' => $product->is_preorder,
                 'preorder_duration' => $product->preorder_duration,
                 'expiration_date' => $product->expiration_date,
-                'multi_images' => json_decode($product->multi_images, true),
+                'multi_images' => json_decode($product->multi_images, true), // ✅ Return as array
                 'is_recommended' => $product->is_recommended, 
                 'created_at' => $product->created_at,
                 'updated_at' => $product->updated_at,
             ], 'Product created successfully 🎉', 201);
+
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to create product', ['error' => $e->getMessage()], 500);
         }

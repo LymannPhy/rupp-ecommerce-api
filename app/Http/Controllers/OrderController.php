@@ -11,6 +11,8 @@ use App\Models\OrderDetail;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\PaymentController;
+use App\Models\Coupon;
+use App\Models\OrderItem;
 use Illuminate\Support\Facades\Log;
 
 
@@ -38,6 +40,7 @@ class OrderController extends Controller
                 'remarks' => 'nullable|string',
                 'payment_method' => 'required|string|in:credit_card,paypal,cash_on_delivery,qr_code',
                 'md5_hash' => 'required_if:payment_method,qr_code|string',
+                'coupon_code' => 'nullable|string|exists:coupons,code',
             ]);
 
             // 🔹 Fetch Cart Items
@@ -62,8 +65,29 @@ class OrderController extends Controller
             }
 
             $totalCartValue = 0;
+            $couponDiscount = 0;
+            $coupon = null;
 
-            // 🔹 Calculate total price
+            // 🔹 Apply coupon discount
+            if ($request->coupon_code) {
+                $coupon = Coupon::where('code', $request->coupon_code)->first();
+
+                if (!$coupon || !$coupon->isValid()) {
+                    return ApiResponse::error('Invalid or expired coupon.', [], 400);
+                }
+
+                if ($coupon->hasReachedMaxUsage()) {
+                    return ApiResponse::error('Coupon usage limit reached.', [], 400);
+                }
+
+                if ($coupon->hasUserExceededLimit(auth()->id())) {
+                    return ApiResponse::error('You have already used this coupon.', [], 400);
+                }
+
+                $couponDiscount = ($coupon->discount_percentage / 100) * $totalCartValue;
+            }
+
+            // 🔹 Process cart items and calculate final total price
             $processedCartItems = $cartItems->map(function ($item) use (&$totalCartValue) {
                 $discountedPrice = $item->price;
                 $totalDiscount = 0;
@@ -81,17 +105,19 @@ class OrderController extends Controller
                     'product_name' => $item->product_name,
                     'quantity' => $item->quantity,
                     'original_price' => $item->price,
-                    'discount_percentage' => $item->discount_percentage ?? 0,
-                    'total_discount' => round($totalDiscount * $item->quantity, 2),
                     'discounted_price' => $discountedPrice,
                     'total_price' => $totalProductPrice,
                 ];
             });
 
+            // ✅ Apply coupon discount
+            $totalCartValue = round($totalCartValue - $couponDiscount, 2);
+
             // 🔹 Create Order
             $order = Order::create([
                 'user_id' => auth()->id(),
                 'total_price' => $totalCartValue,
+                'coupon_id' => $coupon ? $coupon->id : null,
                 'status' => 'pending',
             ]);
 
@@ -105,24 +131,45 @@ class OrderController extends Controller
                 'remarks' => $validated['remarks'] ?? null,
             ]);
 
+            // ✅ Save Order Items (Products in the Order)
+            foreach ($cartItems as $item) {
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $item->product_id,
+                    'quantity' => $item->quantity,
+                    'price' => $item->price,
+                    'discounted_price' => $item->discount_percentage > 0
+                        ? round($item->price - ($item->discount_percentage / 100) * $item->price, 2)
+                        : $item->price,
+                ]);
+            }
+
+            // ✅ Update Coupon Usage
+            if ($coupon) {
+                DB::table('coupon_users')->updateOrInsert(
+                    ['user_id' => auth()->id(), 'coupon_id' => $coupon->id],
+                    ['usage_count' => DB::raw('usage_count + 1')]
+                );
+            }
+
             // 🔹 Payment Handling (QR Code Transaction Verification)
             if ($validated['payment_method'] === 'qr_code') {
-            
+
                 $paymentCheckResponse = $this->paymentController->checkPayment(new Request(['md5' => $validated['md5_hash']]));
-            
+
                 $paymentCheck = json_decode(json_encode($paymentCheckResponse->getData()), true); // Convert to array
 
                 // ✅ Log the full API response from checkPayment()
                 Log::info("📨 Payment API Response:", $paymentCheck);
-            
+
                 // ✅ Check if API response is successful based on `code` field
                 if (!isset($paymentCheck['code']) || $paymentCheck['code'] !== 200 || !isset($paymentCheck['data'])) {
                     return ApiResponse::error('QR Payment verification failed.', ['response' => $paymentCheck], 400);
                 }
-            
+
                 // ✅ Extract payment data
                 $paymentData = $paymentCheck['data'];
-            
+
                 Payment::create([
                     'order_id' => $order->id,
                     'transaction_hash' => $validated['md5_hash'],
@@ -138,11 +185,10 @@ class OrderController extends Controller
                     'external_ref' => $paymentData['externalRef'] ?? null,
                     'payment_status' => 'paid',
                 ]);
-            
+
                 // ✅ Update order status to processing
                 $order->update(['status' => 'processing']);
             }
-            
 
             // 🔹 Clear User's Cart
             Cart::where('user_id', auth()->id())->delete();
@@ -153,6 +199,7 @@ class OrderController extends Controller
                 'order_id' => $order->uuid,
                 'total_price' => $totalCartValue,
                 'cart_items' => $processedCartItems,
+                'coupon_discount' => $couponDiscount,
             ], 'Order placed successfully!');
 
         } catch (\Exception $e) {
@@ -160,4 +207,5 @@ class OrderController extends Controller
             return ApiResponse::error('Checkout failed.', ['error' => $e->getMessage()], 500);
         }
     }
+
 }
