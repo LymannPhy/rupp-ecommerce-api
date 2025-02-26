@@ -17,8 +17,6 @@ return new class extends Migration
             $table->uuid('uuid')->unique()->default(Str::uuid());
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->decimal('total_price', 10, 2);
-            $table->decimal('delivery_price', 10, 2)->default(0.00); 
-            $table->timestamp('delivery_date')->nullable();
             $table->string('status')->default('pending'); 
             $table->timestamps();
         }); 

@@ -15,7 +15,7 @@ class OrderDetail extends Model
         'order_id',
         'email',
         'phone_number',
-        'current_address',
+        'province_id',
         'google_map_link',
         'remarks',
     ];
@@ -26,5 +26,13 @@ class OrderDetail extends Model
     public function order()
     {
         return $this->belongsTo(Order::class);
+    }
+
+    /**
+     * Define the relationship with the Province model.
+     */
+    public function province()
+    {
+        return $this->belongsTo(Province::class, 'province_id');
     }
 }

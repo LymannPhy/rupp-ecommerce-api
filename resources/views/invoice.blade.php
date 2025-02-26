@@ -189,34 +189,31 @@
                 <div class="company-info">
                     <h1>CAM-O2</h1>
                     <p>123 Business Street</p>
-                    <p>City, State 12345</p>
-                    <p>Phone: (555) 123-4567</p>
+                    <p>Phnom Penh Thmey, Sen Sok, Phnom Penh</p>
+                    <p>Phone: (+855) 92 838 609</p>
                     <p>Email: camo2.info88@gmail.com</p>
                 </div>
             </div>
             <div class="invoice-info">
                 <h2>INVOICE <span class="paid-stamp">PAID</span></h2>
-                <p><strong>Invoice #:</strong> INV-2024-001</p>
-                <p><strong>Date:</strong> February 26, 2024</p>
-                <p><strong>Payment Date:</strong> February 26, 2024</p>
+                <p><strong>Invoice #:</strong> {{ $order->id }}</p>
+                <p><strong>Date:</strong> {{ $order->created_at->format('F d, Y') }}</p>
+                <p><strong>Payment Date:</strong> {{ $order->updated_at->format('F d, Y') }}</p>
             </div>
         </div>
 
         <div class="client-details">
             <div class="detail-group">
                 <h3>Bill To</h3>
-                <p><strong>John Doe</strong></p>
-                <p>Client Company Name</p>
-                <p>456 Client Street</p>
-                <p>Client City, State 67890</p>
-                <p>Phone: (555) 987-6543</p>
+                <p><strong>{{ $order->orderDetail->email }}</strong></p>
+                <p>Phone: {{ $order->orderDetail->phone_number }}</p>
+                <p>Province: {{ $order->orderDetail->province->name }}</p>
             </div>
             <div class="detail-group">
                 <h3>Delivery Details</h3>
                 <p><strong>Delivery Address:</strong></p>
-                <p>456 Client Street</p>
-                <p>Client City, State 67890</p>
-                <p><strong>Delivery Date:</strong> February 28, 2024</p>
+                <p>{{ $order->orderDetail->province->name }}</p>
+                <p><strong>Delivery Date:</strong> {{ now()->addDays(2)->format('F d, Y') }}</p>
                 <p><strong>Delivery Method:</strong> Standard Delivery</p>
             </div>
         </div>
@@ -231,39 +228,29 @@
                 </tr>
             </thead>
             <tbody>
+                @foreach($order->orderItems as $item)
                 <tr>
-                    <td>Product Name 1</td>
-                    <td>2</td>
-                    <td>$99.99</td>
-                    <td>$199.98</td>
+                    <td>{{ $item->product->name }}</td>
+                    <td>{{ $item->quantity }}</td>
+                    <td>${{ number_format($item->price, 2) }}</td>
+                    <td>${{ number_format($item->quantity * $item->price, 2) }}</td>
                 </tr>
-                <tr>
-                    <td>Product Name 2</td>
-                    <td>1</td>
-                    <td>$149.99</td>
-                    <td>$149.99</td>
-                </tr>
-                <tr>
-                    <td>Service Name 1</td>
-                    <td>3</td>
-                    <td>$75.00</td>
-                    <td>$225.00</td>
-                </tr>
+                @endforeach
             </tbody>
         </table>
 
         <div class="totals">
             <div class="total-row">
                 <span>Subtotal:</span>
-                <span>$574.97</span>
+                <span>${{ number_format($order->total_price - $order->orderDetail->province->delivery_fee, 2) }}</span>
             </div>
             <div class="total-row">
                 <span>Delivery Fee:</span>
-                <span>$15.00</span>
+                <span>${{ number_format($order->orderDetail->province->delivery_fee, 2) }}</span>
             </div>
             <div class="total-row final">
                 <span>Total Paid:</span>
-                <span>$647.47</span>
+                <span>${{ number_format($order->total_price, 2) }}</span>
             </div>
         </div>
 

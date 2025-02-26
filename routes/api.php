@@ -70,7 +70,9 @@ Route::middleware([JwtMiddleware::class])->group(function () {
     });
 
     Route::prefix('orders')->group(function () {
-        Route::post('/checkout', [OrderController::class, 'checkout']);
+        Route::post('/confirm_order', [OrderController::class, 'confirmOrder']);
+        Route::post('/get-total-amount', [OrderController::class, 'getOrderSummary']);
+        Route::get('/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
     });
 
     Route::prefix('payments')->group(function () {
@@ -111,7 +113,6 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::get('/{uuid}/comments', [BlogController::class, 'getBlogComments']);
         Route::delete('/comment/{uuid}', [BlogController::class, 'deleteComment']);
     });
-    
     
 });
 
