@@ -55,7 +55,7 @@ class ImageUploadController extends Controller
         $images = $request->file('images');
 
         if (!is_array($images)) {
-            $images = [$images]; // Convert single file into an array
+            $images = [$images]; 
         }
 
         // Validate images
