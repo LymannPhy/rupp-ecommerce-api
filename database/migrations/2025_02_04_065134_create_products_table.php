@@ -25,11 +25,9 @@ return new class extends Migration
             $table->decimal('price', 10, 2); 
             $table->integer('stock')->default(0);
             $table->boolean('is_preorder')->default(false);
-            $table->integer('preorder_duration')->nullable(); 
             $table->string('color')->nullable(); 
             $table->string('size')->nullable();
             $table->boolean('is_recommended')->default(false);
-            $table->date('expiration_date')->nullable(); 
             $table->boolean('is_deleted')->default(false); 
             $table->timestamps();
         });

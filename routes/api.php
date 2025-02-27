@@ -16,6 +16,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductFeedbackController;
+use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Middleware\JwtMiddleware;
 
@@ -52,7 +53,12 @@ Route::prefix('products')->group(function () {
     Route::get('/discounted', [ProductController::class, 'getDiscountedProducts']);
     Route::get('/popular-products', [ProductController::class, 'getPopularProducts']);
     Route::get('/recommended', [ProductController::class, 'recommended']);
+    Route::get('/preorders', [ProductController::class, 'getPreorderProducts']);
     Route::get('/{uuid}', [ProductController::class, 'show']);
+});
+
+Route::prefix('feedbacks')->group(function () {
+    Route::get('/promoted-feedbacks', [FeedbackController::class, 'getPromotedFeedbacks']);
 });
 
 
@@ -96,11 +102,6 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::post('/', [BookmarkController::class, 'store']); 
         Route::get('/', [BookmarkController::class, 'index']); 
         Route::delete('/{uuid}', [BookmarkController::class, 'destroy']);
-    });
-
-    Route::prefix('feedbacks')->group(function () {
-        Route::post('/', [FeedbackController::class, 'storeFeedback']); 
-        Route::delete('/{uuid}', [FeedbackController::class, 'destroy']);
     });
 
     Route::prefix('product-feedbacks')->group(function () {
@@ -159,7 +160,6 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     Route::prefix('feedbacks')->group(function () {
         Route::get('/', [FeedbackController::class, 'getAllFeedbacks']); 
         Route::delete('/{uuid}', [FeedbackController::class, 'deleteFeedback']);
-        Route::get('/promoted-feedbacks', [FeedbackController::class, 'getPromotedFeedbacks']);
         Route::patch('/{uuid}/status', [FeedbackController::class, 'updateFeedbackStatus']);
     });
 
@@ -171,6 +171,12 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     Route::prefix('product-feedbacks')->group(function () {
         Route::get('/all', [ProductFeedbackController::class, 'getAllFeedbacks']);
         Route::delete('/soft-delete/{uuid}', [ProductFeedbackController::class, 'softDelete']);
+    });
+
+    Route::prefix('suppliers')->group(function () {
+        Route::post('/create', [SupplierController::class, 'store']);
+        Route::put('/update/{uuid}', [SupplierController::class, 'update']);
+        Route::delete('/delete/{uuid}', [SupplierController::class, 'delete']);
     });
     
     

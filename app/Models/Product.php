@@ -22,11 +22,9 @@ class Product extends Model
         'price',
         'stock',
         'is_preorder',
-        'preorder_duration',
         'color',
         'size',
         'is_recommended',
-        'expiration_date',
         'is_deleted',
     ];
 
@@ -52,7 +50,6 @@ class Product extends Model
         $now = Carbon::now();
         return $this->is_active && (!$this->start_date || $now >= $this->start_date) && (!$this->end_date || $now <= $this->end_date);
     }
-
 
     // Relationship: Product belongs to a Category
     public function category()
@@ -83,5 +80,11 @@ class Product extends Model
     {
         return $this->hasMany(ProductFeedback::class, 'product_id');
     }
+
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class);
+    }
+
 
 }

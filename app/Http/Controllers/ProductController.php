@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\DateHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
@@ -15,6 +16,36 @@ use Carbon\Carbon;
 
 class ProductController extends Controller
 {
+    /**
+     * Get all pre-order products with pagination.
+     */
+    public function getPreorderProducts(Request $request)
+    {
+        // Get paginated pre-order products
+        $perPage = $request->query('page_size', 10);
+        $preorderProducts = Product::where('is_preorder', true)
+            ->orderBy('created_at', 'desc')
+            ->paginate($perPage);
+
+        // Extract required fields
+        $formattedProducts = $preorderProducts->map(function ($product) {
+            return [
+                'uuid' => $product->uuid,
+                'name' => $product->name,
+                'description' => $product->description,
+                'original_price' => $product->price,
+                'discount_price' => $product->discount ? $product->price - ($product->price * $product->discount->percentage / 100) : $product->price,
+                'is_preorder' => $product->is_preorder,
+                'created_at' => $product->created_at,
+            ];
+        });
+
+        // Format response using PaginationHelper
+        $response = PaginationHelper::formatPagination($preorderProducts, $formattedProducts);
+
+        return ApiResponse::sendResponse($response, 'Pre-order products retrieved successfully');
+    }
+
     /**
      * Retrieve recommended products sorted by creation date with pagination.
      *
@@ -182,7 +213,6 @@ class ProductController extends Controller
                     'stock'              => $product->stock,
                     'category'           => $product->category->name ?? null,
                     'is_preorder'        => $product->is_preorder,
-                    'expiration_date'    => $product->expiration_date,
                     'order_count'        => $product->order_items_count,
                     'views'              => $product->views,
                     'feedback_count'     => $product->feedbacks_count,
@@ -269,7 +299,6 @@ class ProductController extends Controller
                     'stock'              => $product->stock,
                     'category'           => $product->category->name ?? null,
                     'is_preorder'        => $product->is_preorder,
-                    'expiration_date'    => $product->expiration_date,
                     'created_at'         => $product->created_at,
                     'updated_at'         => $product->updated_at,
                 ];
@@ -410,19 +439,18 @@ class ProductController extends Controller
                 'category_name' => $product->category->name ?? null,
                 'description' => $product->description,
                 'price' => $product->price,
-                'discount_percentage' => $product->discount->discount_percentage ?? 0,
                 'discounted_price' => $discountedPrice,
+                'discount_start_date' => DateHelper::formatDate($product->discount->start_date), 
+                'discount_end_date' => DateHelper::formatDate($product->discount->end_date), 
                 'stock' => $product->stock,
                 'is_preorder' => $product->is_preorder,
-                'preorder_duration' => $product->preorder_duration,
-                'expiration_date' => $product->expiration_date,
-                'images' => $multiImages, // Only return multiple images
+                'images' => $multiImages,
                 'color' => $product->color,
                 'size' => $product->size,
                 'views' => $product->views,
                 'average_rating' => round($averageRating, 2),
-                'created_at' => $product->created_at,
-                'updated_at' => $product->updated_at,
+                'created_at' => DateHelper::formatDate($product->created_at),
+                'updated_at' => DateHelper::formatDate($product->updated_at),
                 'feedbacks' => $formattedFeedbacks,
                 'similar_products' => $similarProducts,
             ], 'Product details retrieved successfully with discount price, top feedbacks, and similar products ✅');
@@ -458,7 +486,6 @@ class ProductController extends Controller
         }
     }
 
-    
     /**
      * Update an existing product by UUID.
      *
@@ -484,10 +511,7 @@ class ProductController extends Controller
                 'discount_uuid' => 'nullable|exists:discounts,uuid',
                 'price' => 'sometimes|required|numeric|min:0',
                 'stock' => 'sometimes|required|integer|min:0',
-                'glycemic_index' => 'nullable|numeric|min:0',
                 'is_preorder' => 'sometimes|boolean',
-                'preorder_duration' => 'nullable|integer|min:1',
-                'expiration_date' => 'nullable|date',
                 'multi_images' => 'nullable|array',
                 'multi_images.*' => 'string|max:255',
             ]);
@@ -520,8 +544,6 @@ class ProductController extends Controller
                 'price' => $request->price ?? $product->price,
                 'stock' => $request->stock ?? $product->stock,
                 'is_preorder' => filter_var($request->is_preorder, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $product->is_preorder,
-                'preorder_duration' => $request->preorder_duration ?? $product->preorder_duration,
-                'expiration_date' => $request->expiration_date ?? $product->expiration_date,
                 'multi_images' => $multiImages,
             ]);
 
@@ -534,8 +556,6 @@ class ProductController extends Controller
                 'price' => $product->price,
                 'stock' => $product->stock,
                 'is_preorder' => $product->is_preorder,
-                'preorder_duration' => $product->preorder_duration,
-                'expiration_date' => $product->expiration_date,
                 'single_image' => $request->multi_images ? ($request->multi_images[0] ?? null) : (json_decode($product->multi_images, true)[0] ?? null),
                 'images' => json_decode($product->multi_images, true) ?? [],
                 'created_at' => $product->created_at,
@@ -598,13 +618,8 @@ class ProductController extends Controller
                     'discount_percentage' => $product->discount->discount_percentage ?? 0,
                     'discounted_price' => $discountedPrice,
                     'stock' => $product->stock,
-                    'glycemic_index' => $product->glycemic_index,
                     'is_preorder' => $product->is_preorder,
-                    'preorder_duration' => $product->preorder_duration,
-                    'expiration_date' => $product->expiration_date,
                     'multi_images' => json_decode($product->multi_images, true) ?? [],
-                    'slogan' => $product->slogan,
-                    'health_benefits' => $product->health_benefits,
                     'color' => $product->color,
                     'size' => $product->size,
                     'average_rating' => round($averageRating, 2),
@@ -642,8 +657,6 @@ class ProductController extends Controller
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'is_preorder' => 'boolean',
-            'preorder_duration' => 'nullable|integer|min:1',
-            'expiration_date' => 'nullable|date',
             'multi_images' => 'nullable|array',
             'multi_images.*' => 'string|max:255',
             'is_recommended' => 'boolean',
@@ -686,9 +699,7 @@ class ProductController extends Controller
                 'price' => $request->price,
                 'stock' => $request->stock,
                 'is_preorder' => $request->is_preorder ?? false,
-                'preorder_duration' => $request->preorder_duration,
-                'expiration_date' => $request->expiration_date,
-                'multi_images' => json_encode($multiImages), // ✅ Cleaned JSON
+                'multi_images' => json_encode($multiImages), 
                 'is_recommended' => $request->is_recommended ?? false, 
             ]);
 
@@ -702,8 +713,6 @@ class ProductController extends Controller
                 'price' => $product->price,
                 'stock' => $product->stock,
                 'is_preorder' => $product->is_preorder,
-                'preorder_duration' => $product->preorder_duration,
-                'expiration_date' => $product->expiration_date,
                 'multi_images' => json_decode($product->multi_images, true), // ✅ Return as array
                 'is_recommended' => $product->is_recommended, 
                 'created_at' => $product->created_at,
@@ -714,7 +723,5 @@ class ProductController extends Controller
             return ApiResponse::error('Failed to create product', ['error' => $e->getMessage()], 500);
         }
     }
-
-
 }
 
