@@ -19,6 +19,10 @@ use App\Http\Controllers\ProductFeedbackController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Middleware\JwtMiddleware;
+use App\Http\Controllers\SocialController;
+
+// Login with Provider
+Route::post('auth/google', [SocialController::class, 'handleProviderCallback']);
 
 
 // Public Auth Routes
@@ -59,6 +63,11 @@ Route::prefix('products')->group(function () {
 
 Route::prefix('feedbacks')->group(function () {
     Route::get('/promoted-feedbacks', [FeedbackController::class, 'getPromotedFeedbacks']);
+});
+
+Route::prefix('suppliers')->group(function () {
+    Route::get('/{uuid}/qr-code', [SupplierController::class, 'generateSupplierQRCode']);
+    Route::get('/{uuid}', [SupplierController::class, 'showSupplierProfile']);
 });
 
 
@@ -174,6 +183,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     });
 
     Route::prefix('suppliers')->group(function () {
+        Route::get('/', [SupplierController::class, 'getAllSuppliers']);
         Route::post('/create', [SupplierController::class, 'store']);
         Route::put('/update/{uuid}', [SupplierController::class, 'update']);
         Route::delete('/delete/{uuid}', [SupplierController::class, 'delete']);

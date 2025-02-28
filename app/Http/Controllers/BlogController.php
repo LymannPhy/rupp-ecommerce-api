@@ -369,7 +369,8 @@ class BlogController extends Controller
                 'views' => $blog->views,
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
-                'admin' => [
+                'tags' => $blog->tags->pluck('name')->toArray(),
+                'user' => [
                     'uuid' => $blog->admin->uuid,
                     'name' => $blog->admin->name,
                     'email' => $blog->admin->email,
@@ -404,7 +405,7 @@ class BlogController extends Controller
         $blog->increment('views');
 
         // Fetch admin user with UUID
-        $admin = $blog->admin()->first(['uuid', 'name', 'email']);
+        $admin = $blog->admin()->first(['uuid', 'name', 'email', 'avatar']);
 
         return ApiResponse::sendResponse([
             'uuid' => $blog->uuid,
@@ -489,7 +490,7 @@ class BlogController extends Controller
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
                 'tags' => $blog->tags->pluck('name')->toArray(), 
-                'admin' => $admin
+                'user' => $admin
             ], '🎉 Blog created successfully!', 201);
 
         } catch (\Exception $e) {

@@ -159,28 +159,44 @@ class CategoryController extends Controller
     }
 
     /**
-     * Get all categories.
+     * Get all categories with their subcategories.
      *
      * @return \Illuminate\Http\JsonResponse
      */
     public function index()
     {
         try {
-            $categories = Category::all()->map(function ($category) {
+            // ✅ Load all categories where parent_id is null (Parent Categories)
+            $categories = Category::whereNull('parent_id')
+                ->with(['subcategories']) // ✅ Load subcategories
+                ->get();
+
+            // ✅ Format categories with subcategories
+            $formattedCategories = $categories->map(function ($category) {
                 return [
                     'uuid' => $category->uuid,
                     'name' => $category->name,
                     'is_deleted' => $category->is_deleted,
                     'created_at' => $category->created_at,
                     'updated_at' => $category->updated_at,
+                    'subcategories' => $category->subcategories->map(function ($sub) {
+                        return [
+                            'uuid' => $sub->uuid,
+                            'name' => $sub->name,
+                            'is_deleted' => $sub->is_deleted,
+                            'created_at' => $sub->created_at,
+                            'updated_at' => $sub->updated_at,
+                        ];
+                    }),
                 ];
             });
 
-            return ApiResponse::sendResponse($categories, 'Categories loaded successfully ✅');
+            return ApiResponse::sendResponse($formattedCategories, 'Categories with subcategories loaded successfully ✅');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to load categories', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 
    /**

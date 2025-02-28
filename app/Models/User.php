@@ -116,5 +116,9 @@ class User extends Authenticatable implements JWTSubject
         return $this->hasMany(BlogComment::class);
     }
 
+    public function linkedSocialAccounts()
+    {
+        return $this->hasOne(LinkedSocialAccount::class);
+    }
 
 }

@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\SupplierController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -12,7 +13,12 @@ use Illuminate\Support\Facades\Route;
 | be assigned to the "web" middleware group. Make something great!
 |
 */
+Route::get('/', [SupplierController::class, 'showQRModal']);
 
+
+// Route::get('/', function () {
+//     return view('suppliers.qr_modal'); 
+// });
 Route::get('/', function () {
-    return view('welcome');
+    return view('login'); 
 });

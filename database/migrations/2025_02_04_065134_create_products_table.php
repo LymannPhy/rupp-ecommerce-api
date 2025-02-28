@@ -27,7 +27,7 @@ return new class extends Migration
             $table->boolean('is_preorder')->default(false);
             $table->string('color')->nullable(); 
             $table->string('size')->nullable();
-            $table->boolean('is_recommended')->default(false);
+            $table->boolean('is_recommended')->default(false); 
             $table->boolean('is_deleted')->default(false); 
             $table->timestamps();
         });

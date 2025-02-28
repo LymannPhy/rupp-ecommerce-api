@@ -12,7 +12,13 @@ use App\Models\Discount;
 use App\Http\Responses\ApiResponse;
 use App\Helpers\PaginationHelper;
 use App\Models\ProductFeedback;
+use App\Models\Supplier;
 use Carbon\Carbon;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\ErrorCorrectionLevel;
+use Illuminate\Support\Facades\URL;
 
 class ProductController extends Controller
 {
@@ -432,6 +438,40 @@ class ProductController extends Controller
                 });
             }
 
+            // ✅ Retrieve the supplier
+            $supplier = $product->supplier;
+            $qrCodeBase64 = null;
+
+            if ($supplier) {
+                // ✅ Generate supplier profile URL
+                $supplierProfileUrl = URL::to('/supplier/' . $supplier->uuid);
+
+                // ✅ Generate QR Code
+                $qrCode = QrCode::create($supplierProfileUrl)
+                    ->setEncoding(new Encoding('UTF-8'))
+                    ->setErrorCorrectionLevel(ErrorCorrectionLevel::Low)
+                    ->setSize(300)
+                    ->setMargin(10);
+
+                // Generate PNG format
+                $writer = new PngWriter();
+                $qrCodeResult = $writer->write($qrCode);
+
+                // Convert to Base64
+                $qrCodeBase64 = 'data:image/png;base64,' . base64_encode($qrCodeResult->getString());
+            }
+
+            // ✅ Format supplier data including the QR code
+            $supplierData = $supplier ? [
+                'uuid' => $supplier->uuid,
+                'name' => $supplier->name,
+                'email' => $supplier->email,
+                'phone' => $supplier->phone,
+                'address' => $supplier->address,
+                'avatar' => $supplier->avatar,
+                'qr_code' => $qrCodeBase64, 
+            ] : null;
+
             // Format product response including similar products and the updated view count
             return ApiResponse::sendResponse([
                 'uuid' => $product->uuid,
@@ -453,6 +493,7 @@ class ProductController extends Controller
                 'updated_at' => DateHelper::formatDate($product->updated_at),
                 'feedbacks' => $formattedFeedbacks,
                 'similar_products' => $similarProducts,
+                'supplier' => $supplierData,
             ], 'Product details retrieved successfully with discount price, top feedbacks, and similar products ✅');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve product details 🤯', ['error' => $e->getMessage()], 500);
@@ -649,11 +690,12 @@ class ProductController extends Controller
     {
         // Validate request data
         $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255|unique:products,name',
+            'name' => 'required|string|max:255',
             'description' => 'required|string',
             'category_uuid' => 'required|exists:categories,uuid',
             'subcategory_uuid' => 'nullable|exists:categories,uuid',
             'discount_uuid' => 'nullable|exists:discounts,uuid',
+            'supplier_uuid' => 'required|exists:suppliers,uuid',
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'is_preorder' => 'boolean',
@@ -681,6 +723,13 @@ class ProductController extends Controller
             // Retrieve discount if provided
             $discount = $request->discount_uuid ? Discount::where('uuid', $request->discount_uuid)->first() : null;
 
+            // ✅ Retrieve supplier
+            $supplier = Supplier::where('uuid', $request->supplier_uuid)->first();
+
+            if (!$supplier) {
+                return ApiResponse::error('Invalid Supplier ❌', ['supplier_uuid' => 'The specified supplier does not exist.'], 400);
+            }
+
             // ✅ **Clean and store `multi_images` correctly**
             $multiImages = $request->multi_images ?? [];
             if (!empty($multiImages)) {
@@ -694,6 +743,7 @@ class ProductController extends Controller
                 'uuid' => Str::uuid(),
                 'category_id' => $subcategory ? $subcategory->id : $category->id, 
                 'discount_id' => $discount ? $discount->id : null,
+                'supplier_id' => $supplier->id,
                 'name' => $request->name,
                 'description' => $request->description,
                 'price' => $request->price,
@@ -708,6 +758,7 @@ class ProductController extends Controller
                 'category_uuid' => $category->uuid,
                 'subcategory_uuid' => $subcategory ? $subcategory->uuid : null,
                 'discount_uuid' => $discount ? $discount->uuid : null,
+                'supplier_uuid' => $supplier->uuid,
                 'name' => $product->name,
                 'description' => $product->description,
                 'price' => $product->price,

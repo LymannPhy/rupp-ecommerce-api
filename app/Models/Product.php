@@ -15,6 +15,7 @@ class Product extends Model
         'uuid',
         'category_id',
         'discount_id',
+        'supplier_id',
         'name',
         'description',
         'multi_images',
@@ -85,6 +86,5 @@ class Product extends Model
     {
         return $this->belongsTo(Supplier::class);
     }
-
 
 }

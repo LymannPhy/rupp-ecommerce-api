@@ -2,15 +2,123 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\PaginationHelper;
 use App\Http\Responses\ApiResponse;
 use App\Models\Supplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
+use Endroid\QrCode\QrCode;
+use Endroid\QrCode\Writer\PngWriter;
+use Endroid\QrCode\Encoding\Encoding;
+use Endroid\QrCode\ErrorCorrectionLevel;
+use Illuminate\Support\Facades\URL;
+
 
 class SupplierController extends Controller
 {
+    public function showQRModal()
+    {
+        $apiBaseUrl = env('API_BASE_URL', config('app.url')); 
+
+        return view('suppliers.qr_modal', compact('apiBaseUrl'));
+    }
+
+
+    /**
+     * Show supplier profile page.
+     *
+     * @param string $uuid
+     * @return \Illuminate\View\View
+     */
+    public function showSupplierProfile($uuid)
+    {
+        $supplier = Supplier::where('uuid', $uuid)->first();
+
+        if (!$supplier) {
+            abort(404, 'Supplier not found');
+        }
+
+        return view('suppliers.profile', compact('supplier'));
+    }
+
+
+    /**
+     * Generate a QR code for a supplier profile.
+     *
+     * @param string $uuid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function generateSupplierQRCode($uuid)
+    {
+        try {
+            // Retrieve the supplier by UUID
+            $supplier = Supplier::where('uuid', $uuid)->first();
+
+            if (!$supplier) {
+                return ApiResponse::error('Supplier not found', [], 404);
+            }
+
+            // ✅ Generate URL for supplier profile page
+            $supplierProfileUrl = URL::to('/supplier/' . $supplier->uuid);
+
+            // ✅ Generate QR Code with the profile URL
+            $qrCode = QrCode::create($supplierProfileUrl) 
+                ->setEncoding(new Encoding('UTF-8'))
+                ->setErrorCorrectionLevel(ErrorCorrectionLevel::Low)
+                ->setSize(300)
+                ->setMargin(10);
+
+            // Generate PNG format
+            $writer = new PngWriter();
+            $qrCodeResult = $writer->write($qrCode);
+
+            // Convert to Base64
+            $qrCodeBase64 = 'data:image/png;base64,' . base64_encode($qrCodeResult->getString());
+
+            return ApiResponse::sendResponse([
+                'qr_code' => $qrCodeBase64, 
+            ], 'QR Code generated successfully', 200);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to generate QR Code', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Load all suppliers with optional search and pagination, using PaginationHelper.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getAllSuppliers(Request $request)
+    {
+        try {
+            // Get search query (if any)
+            $search = $request->query('search');
+
+            // Define query
+            $query = Supplier::query();
+
+            // Apply search filter
+            if ($search) {
+                $query->where('name', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%")
+                    ->orWhere('phone', 'LIKE', "%{$search}%");
+            }
+
+            // Paginate results (default 10 per page)
+            $suppliers = $query->orderBy('created_at', 'desc')->paginate($request->query('per_page', 10));
+
+            // Format the response using PaginationHelper
+            $formattedResponse = PaginationHelper::formatPagination($suppliers, $suppliers->items());
+
+            return ApiResponse::sendResponse($formattedResponse, 'Suppliers loaded successfully', 200);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to load suppliers', ['error' => $e->getMessage()], 500);
+        }
+    }
+
     /**
      * Create a new supplier.
      */

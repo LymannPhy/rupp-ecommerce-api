@@ -77,7 +77,19 @@ class Handler extends ExceptionHandler
             ], method_exists($exception, 'getStatusCode') ? $exception->getStatusCode() : 500);
         }
 
-        return parent::render($request, $exception);
+        // ✅ Ensure non-JSON responses are also wrapped in JSON
+        $response = parent::render($request, $exception);
+        
+        return response()->json([
+            'status' => 'error',
+            'code' => $response->getStatusCode(),
+            'message' => 'Unexpected error',
+            'errors' => [
+                'details' => $exception->getMessage(),
+            ],
+            'date' => now()->toDateTimeString(),
+        ], $response->getStatusCode());
     }
+
 
 }
