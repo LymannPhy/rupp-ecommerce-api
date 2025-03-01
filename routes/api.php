@@ -11,6 +11,7 @@ use App\Http\Controllers\ContactUsController;
 use App\Http\Controllers\CouponController;
 use App\Http\Controllers\DiscountController;
 use App\Http\Controllers\FeedbackController;
+use App\Http\Controllers\GoogleController;
 use App\Http\Controllers\ImageUploadController;
 use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
@@ -19,11 +20,10 @@ use App\Http\Controllers\ProductFeedbackController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Middleware\JwtMiddleware;
-use App\Http\Controllers\SocialController;
 
-// Login with Provider
-Route::post('auth/google', [SocialController::class, 'handleProviderCallback']);
 
+Route::get('auth/google', [GoogleController::class, 'redirectToGoogle']);
+Route::get('auth/google/callback', [GoogleController::class, 'handleGoogleCallback']);
 
 // Public Auth Routes
 Route::post('register', [AuthController::class, 'register']);

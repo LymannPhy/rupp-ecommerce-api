@@ -25,7 +25,7 @@ class User extends Authenticatable implements JWTSubject
         'uuid', 'name', 'email', 'password', 'avatar', 'address', 'phone_number', 'bio',
         'gender', 'date_of_birth', 'country', 'is_verified', 'is_blocked',
         'verification_code', 'verification_code_expiration', 'reset_password_code',
-        'reset_password_code_expiration'
+        'reset_password_code_expiration', 'google_id'
     ];
 
     /**
