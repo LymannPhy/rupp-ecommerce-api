@@ -154,8 +154,6 @@ class CartController extends Controller
     }
 
 
-
-
     /**
      * Remove a single product from the authenticated user's cart.
      *
@@ -259,31 +257,24 @@ class CartController extends Controller
                             ->first();
 
             if ($cartItem) {
-                // Update quantity if already in the cart
-                $newQuantity = $cartItem->quantity + $request->quantity;
-
-                // Ensure new quantity doesn't exceed stock
-                if ($newQuantity > $product->stock) {
-                    return ApiResponse::error('Insufficient stock ❌', [
-                        'product_uuid' => $product->uuid,
-                        'stock' => 'Only ' . $product->stock . ' units available.'
-                    ], 400);
-                }
-
-                $cartItem->update(['quantity' => $newQuantity]);
-            } else {
-                // Add new item to cart
-                Cart::create([
-                    'uuid' => (string) \Illuminate\Support\Str::uuid(),
-                    'user_id' => $user->id,
-                    'product_id' => $product->id,
-                    'quantity' => $request->quantity,
-                ]);
+                return ApiResponse::error('Product already in cart ❌', [
+                    'product_uuid' => $product->uuid,
+                    'message' => 'This product is already in your cart. You cannot add it again.'
+                ], 400);
             }
 
-            return ApiResponse::sendResponse([], 'Product added to cart successfully!');
+            // Add new item to cart
+            Cart::create([
+                'uuid' => (string) \Illuminate\Support\Str::uuid(),
+                'user_id' => $user->id,
+                'product_id' => $product->id,
+                'quantity' => $request->quantity,
+            ]);
+
+            return ApiResponse::sendResponse([], 'Product added to cart successfully! ✅');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to add product to cart 🔥', ['error' => $e->getMessage()], 500);
         }
     }
+
 }
