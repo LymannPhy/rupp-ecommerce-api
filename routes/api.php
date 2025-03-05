@@ -17,6 +17,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductFeedbackController;
+use App\Http\Controllers\ProvinceController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Middleware\JwtMiddleware;
@@ -70,6 +71,7 @@ Route::prefix('suppliers')->group(function () {
     Route::get('/{uuid}', [SupplierController::class, 'showSupplierProfile']);
 });
 
+Route::get('provinces', [ProvinceController::class, 'index']);
 
 //Protected Route
 Route::middleware([JwtMiddleware::class])->group(function () {

@@ -80,21 +80,28 @@ class CartController extends Controller
     public function getCartItems()
     {
         try {
+            $user = auth()->user();
+
+            if (!$user) {
+                return ApiResponse::error('Unauthorized ❌', ['error' => 'User not authenticated'], 401);
+            }
+
             // Fetch cart items with product and discount details
-            $cartItems = Cart::join('products', 'cart.product_id', '=', 'products.id')
-                ->leftJoin('discounts', 'products.discount_id', '=', 'discounts.id') // Join discounts
-                ->select(
-                    'products.uuid as product_uuid',
-                    'products.name as product_name',
-                    'products.multi_images', // ✅ Fetch multi_images (JSON)
-                    'cart.quantity',
-                    'products.price',
-                    'discounts.discount_percentage',
-                    'discounts.is_active',
-                    'discounts.start_date',
-                    'discounts.end_date'
-                )
-                ->get();
+            $cartItems = Cart::where('cart.user_id', $user->id) 
+            ->join('products', 'cart.product_id', '=', 'products.id')
+            ->leftJoin('discounts', 'products.discount_id', '=', 'discounts.id') 
+            ->select(
+                'products.uuid as product_uuid',
+                'products.name as product_name',
+                'products.multi_images', 
+                'cart.quantity',
+                'products.price',
+                'discounts.discount_percentage',
+                'discounts.is_active',
+                'discounts.start_date',
+                'discounts.end_date'
+            )
+            ->get();
 
             // Initialize totals
             $totalCartValue = 0;
@@ -135,7 +142,7 @@ class CartController extends Controller
                 return [
                     'uuid' => $item->product_uuid,
                     'name' => $item->product_name,
-                    'image' => $singleImage, // ✅ Correctly extracted first image
+                    'image' => $singleImage, 
                     'quantity' => $item->quantity,
                     'original_price' => $item->price,
                     'discounted_price' => $discountedPrice,
@@ -144,8 +151,8 @@ class CartController extends Controller
 
             return ApiResponse::sendResponse([
                 'cart_items' => $formattedCartItems,
-                'total_cart_items' => $totalCartItems, // ✅ Total quantity of all items
-                'total_cart_value' => round($totalCartValue, 2) // ✅ Sum of all discounted prices
+                'total_cart_items' => $totalCartItems, 
+                'total_cart_value' => round($totalCartValue, 2)
             ], 'Cart items retrieved successfully! 🛒');
 
         } catch (\Exception $e) {
