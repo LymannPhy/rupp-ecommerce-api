@@ -650,6 +650,11 @@ class ProductController extends Controller
                     $discountedPrice = round($product->price - $discountAmount, 2);
                 }
 
+                // Process images
+                $allImages = json_decode($product->multi_images, true) ?? [];
+                $singleImage = count($allImages) > 0 ? $allImages[0] : null;
+                $multiImages = count($allImages) > 1 ? array_slice($allImages, 1) : [];
+
                 return [
                     'uuid' => $product->uuid,
                     'category_name' => $product->category->name ?? null,
@@ -660,7 +665,8 @@ class ProductController extends Controller
                     'discounted_price' => $discountedPrice,
                     'stock' => $product->stock,
                     'is_preorder' => $product->is_preorder,
-                    'multi_images' => json_decode($product->multi_images, true) ?? [],
+                    'single_image' => $singleImage,
+                    'multi_images' => $multiImages,
                     'color' => $product->color,
                     'size' => $product->size,
                     'average_rating' => round($averageRating, 2),
@@ -668,6 +674,7 @@ class ProductController extends Controller
                     'updated_at' => $product->updated_at,
                 ];
             });
+
 
             // Use helper function for pagination response
             return ApiResponse::sendResponse(

@@ -6,59 +6,146 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use App\Http\Responses\ApiResponse;
+use App\Models\Cart;
+use App\Models\Order;
+use App\Models\OrderDetail;
+use App\Models\OrderItem;
+use App\Models\Payment;
+use App\Models\Province;
+use Illuminate\Support\Facades\DB;
 
 class PaymentController extends Controller
 {
     public function checkPayment(Request $request)
     {
-        // Retrieve the MD5 hash from the request body
-        $md5Hash = $request->input('md5');
-
-        Log::info("Checking payment {$md5Hash}");
-
-        $bakongToken = env('BAKONG_TOKEN');
-
         try {
-            // 🔹 Send POST request to Bakong API
+            DB::beginTransaction();
+
+            // 🔹 Validate request
+            $validated = $request->validate([
+                'md5_hash' => 'required|string',
+                'total_cart_value' => 'required|numeric|min:0',
+                'province_uuid' => 'required|exists:provinces,uuid',
+                'email' => 'required|email',
+                'phone_number' => 'required|string',
+                'current_address' => 'required|string',
+                'google_map_link' => 'nullable|url',
+                'remarks' => 'nullable|string',
+            ]);
+
+            $bakongToken = env('BAKONG_TOKEN');
+
+            // 🔹 Call Bakong API to verify payment
             $response = Http::withHeaders([
                 'Authorization' => "Bearer {$bakongToken}",
                 'Content-Type' => 'application/json',
             ])->post('https://api-bakong.nbc.gov.kh/v1/check_transaction_by_md5', [
-                'md5' => $md5Hash,
+                'md5' => $validated['md5_hash'],
             ]);
 
             if ($response->failed()) {
-                Log::error("Payment check failed with response: " . $response->body());
-                return ApiResponse::error('QR Payment verification failed.', ['response' => $response->body()], 400);
-            }            
-
-            $responseData = $response->json();
-            Log::info("Payment found: ", $responseData);
-
-            // 🔹 Check if payment is successful
-            if (isset($responseData['responseCode']) && $responseData['responseCode'] === 0) {
-                Log::info("Payment successful");
-
-                $data = $responseData['data'];
-
-                return ApiResponse::sendResponse([
-                    'fromAccountId' => $data['fromAccountId'] ?? 'N/A',
-                    'toAccountId' => $data['toAccountId'] ?? 'N/A',
-                    'currency' => $data['currency'] ?? 'N/A',
-                    'amount' => $data['amount'] ?? 0,
-                    'description' => $data['description'] ?? null,
-                    'createdDateMs' => $data['createdDateMs'] ?? null,
-                    'acknowledgedDateMs' => $data['acknowledgedDateMs'] ?? null,
-                    'externalRef' => $data['externalRef'] ?? 'N/A',
-                ], 'Payment successful');
-            } else {
-                Log::error("Payment check failed with response code: " . ($responseData['responseCode'] ?? 'Unknown'));
-                return ApiResponse::error('Payment failed.', [], 400);
+                Log::error("Payment check failed: " . $response->body());
+                return ApiResponse::error('QR Payment verification failed.', [], 400);
             }
 
+            $paymentCheck = $response->json();
+            Log::info("Payment API Response: ", $paymentCheck);
+
+            // 🔹 Validate response structure
+            if (!isset($paymentCheck['responseCode']) || $paymentCheck['responseCode'] !== 0) {
+                return response()->json([
+                    'date' => now()->toDateTimeString(),
+                    'code' => 400,
+                    'message' => $paymentCheck['message'] ?? 'Payment failed.',
+                    'errors' => $paymentCheck['errors'] ?? [],
+                ], 400);
+            }
+
+            // 🔹 Validate payment data
+            $paymentData = $paymentCheck['data'] ?? null;
+            if (!$paymentData) {
+                return response()->json([
+                    'date' => now()->toDateTimeString(),
+                    'code' => 400,
+                    'message' => 'Invalid payment data received.',
+                    'errors' => [],
+                ], 400);
+            }
+
+            // 🔹 Fetch province ID
+            $province = Province::where('uuid', $validated['province_uuid'])->firstOrFail();
+
+            // 🔹 Create Order
+            $order = Order::create([
+                'user_id' => auth()->id(),
+                'total_price' => $validated['total_cart_value'],
+                'status' => 'processing',
+            ]);
+
+            // 🔹 Store Order Details in `order_details` table
+            OrderDetail::create([
+                'order_id' => $order->id,
+                'email' => $validated['email'],
+                'phone_number' => $validated['phone_number'],
+                'province_id' => $province->id,
+                'google_map_link' => $validated['google_map_link'] ?? null,
+                'remarks' => $validated['remarks'] ?? null,
+            ]);
+
+            // 🔹 Fetch cart items
+            $cartItems = Cart::with('product')
+                ->where('cart.user_id', auth()->id())
+                ->get();
+
+            if ($cartItems->isEmpty()) {
+                return ApiResponse::error('Your cart is empty.', [], 400);
+            }
+
+            // 🔹 Store Order Items
+            foreach ($cartItems as $item) {
+                OrderItem::create([
+                    'order_id' => $order->id,
+                    'product_id' => $item->product->id,
+                    'quantity' => $item->quantity,
+                    'price' => $item->product->price,
+                ]);
+            }
+
+            // 🔹 Store Payment Details
+            Payment::create([
+                'order_id' => $order->id,
+                'user_id' => auth()->id(),
+                'payment_method' => 'qr_code',
+                'amount' => $validated['total_cart_value'],
+                'status' => 'paid',
+                'md5_hash' => $validated['md5_hash'],
+                'transaction_hash' => $paymentData['externalRef'] ?? 'N/A',
+                'from_account_id' => $paymentData['fromAccountId'] ?? 'Unknown',
+                'to_account_id' => $paymentData['toAccountId'] ?? 'Unknown',
+            ]);
+
+            // 🔹 Clear User Cart
+            Cart::where('user_id', auth()->id())->delete();
+
+            DB::commit();
+
+            return response()->json([
+                'date' => now()->toDateTimeString(),
+                'code' => 200,
+                'message' => 'Order placed successfully!',
+            ], 200);            
+
         } catch (\Exception $e) {
-            Log::error("Error checking payment: " . $e->getMessage());
-            return ApiResponse::error('Error checking payment.', [], 500);
+            DB::rollBack();
+            Log::error("Checkout error: " . $e->getMessage());
+
+            return response()->json([
+                'date' => now()->toDateTimeString(),
+                'code' => 500,
+                'message' => 'Checkout failed.',
+                'errors' => ['error' => $e->getMessage()],
+            ], 500);
         }
     }
+
 }

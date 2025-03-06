@@ -6,6 +6,7 @@ use Illuminate\Http\Request;
 use App\Models\Wishlist;
 use App\Models\Product;
 use App\Http\Responses\ApiResponse;
+use App\Models\ProductFeedback;
 use Illuminate\Support\Facades\Auth;
 
 class WishlistController extends Controller
@@ -41,23 +42,32 @@ class WishlistController extends Controller
         $user = Auth::user();
 
         $wishlist = Wishlist::where('user_id', $user->id)
-            ->with(['product:id,uuid,name,price,image', 'user:id,uuid'])
+            ->with(['product:id,uuid,name,price,multi_images', 'user:id,uuid'])
             ->get()
             ->map(function ($item) {
+                $product = $item->product;
+
+                // Get average rating
+                $averageRating = ProductFeedback::where('product_id', $product->id)->avg('rating') ?? 0;
+
+                // Process images
+                $allImages = json_decode($product->multi_images, true) ?? [];
+                $singleImage = count($allImages) > 0 ? $allImages[0] : null;
+
                 return [
                     'wishlist_uuid' => $item->uuid, 
                     'user_uuid' => $item->user->uuid, 
-                    'product_uuid' => $item->product->uuid,
-                    'product_name' => $item->product->name, 
-                    'product_price' => $item->product->price, 
-                    'product_image' => $item->product->image, 
+                    'product_uuid' => $product->uuid,
+                    'product_name' => $product->name, 
+                    'product_price' => $product->price, 
+                    'single_image' => $singleImage, 
+                    'average_rating' => round($averageRating, 2),
                     'created_at' => $item->created_at, 
                 ];
             });
 
         return ApiResponse::sendResponse($wishlist, 'Wishlist retrieved successfully');
     }
-
 
     /**
      * Add product to wishlist using UUID but store product ID.

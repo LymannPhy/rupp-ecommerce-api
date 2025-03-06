@@ -15,9 +15,9 @@ return new class extends Migration
             $table->id();
             $table->foreignId('order_id')->constrained()->onDelete('cascade');
             $table->string('email')->nullable();
-            $table->string('phone_number')->nullable();
+            $table->string('phone_number');
             $table->foreignId('province_id')->constrained('provinces')->onDelete('cascade'); 
-            $table->text('google_map_link')->nullable(); 
+            $table->text('google_map_link'); 
             $table->text('remarks')->nullable(); 
             $table->timestamps();
         });
