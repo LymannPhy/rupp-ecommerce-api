@@ -14,11 +14,14 @@ class Order extends Model
     protected $fillable = [
         'uuid',
         'user_id',
+        'coupon_id',         
         'total_price',
-        'delivery_price',
+        'delivery_price',      
+        'delivery_method',   
         'delivery_date',
         'status'
     ];
+    
 
     // Automatically generate a UUID before saving to the database
     protected static function boot()

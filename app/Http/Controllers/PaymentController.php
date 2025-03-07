@@ -25,7 +25,9 @@ class PaymentController extends Controller
             $validated = $request->validate([
                 'md5_hash' => 'required|string',
                 'total_cart_value' => 'required|numeric|min:0',
+                'final_total' => 'required|numeric|min:0', 
                 'province_uuid' => 'required|exists:provinces,uuid',
+                'delivery_price' => 'required|numeric|min:0', 
                 'email' => 'required|email',
                 'phone_number' => 'required|string',
                 'current_address' => 'required|string',
@@ -72,13 +74,23 @@ class PaymentController extends Controller
                 ], 400);
             }
 
-            // 🔹 Fetch province ID
+            // 🔹 Fetch province details
             $province = Province::where('uuid', $validated['province_uuid'])->firstOrFail();
 
-            // 🔹 Create Order
+            // 🔹 Determine estimated delivery date based on province
+            if ($province->name === 'Phnom Penh') {
+                $deliveryDate = now()->addDay(1); // 1-day delivery for Phnom Penh
+            } else {
+                $deliveryDate = now()->addDays(rand(2, 3)); // 2 to 3 days for other provinces
+            }
+
+            // 🔹 Create Order with delivery details
             $order = Order::create([
                 'user_id' => auth()->id(),
                 'total_price' => $validated['total_cart_value'],
+                'delivery_price' => $validated['delivery_price'], // Now taken from request body
+                'delivery_method' => 'Delivery by Motor', // Static value
+                'delivery_date' => $deliveryDate, // Dynamically calculated
                 'status' => 'processing',
             ]);
 
@@ -111,17 +123,18 @@ class PaymentController extends Controller
                 ]);
             }
 
-            // 🔹 Store Payment Details
+            // 🔹 Store Payment Details with final total
             Payment::create([
                 'order_id' => $order->id,
                 'user_id' => auth()->id(),
                 'payment_method' => 'qr_code',
-                'amount' => $validated['total_cart_value'],
+                'amount' => $validated['final_total'], // Store final total in payments
                 'status' => 'paid',
                 'md5_hash' => $validated['md5_hash'],
                 'transaction_hash' => $paymentData['externalRef'] ?? 'N/A',
                 'from_account_id' => $paymentData['fromAccountId'] ?? 'Unknown',
                 'to_account_id' => $paymentData['toAccountId'] ?? 'Unknown',
+                'transaction_place' => 'Asia/Phnom Penh',
             ]);
 
             // 🔹 Clear User Cart
@@ -133,7 +146,7 @@ class PaymentController extends Controller
                 'date' => now()->toDateTimeString(),
                 'code' => 200,
                 'message' => 'Order placed successfully!',
-            ], 200);            
+            ], 200);
 
         } catch (\Exception $e) {
             DB::rollBack();

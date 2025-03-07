@@ -19,11 +19,8 @@ return new class extends Migration
             $table->string('to_account_id');
             $table->string('currency', 10)->default('USD');
             $table->decimal('amount', 10, 2); 
-            $table->text('description')->nullable(); 
-            $table->timestamp('created_date')->nullable();
-            $table->timestamp('acknowledged_date')->nullable(); 
-            $table->string('external_ref')->nullable();
-            $table->string('payment_status')->default('paid'); 
+            $table->string('payment_status')->default('paid');
+            $table->string('transaction_place')->nullable();
             $table->timestamps();
         });
     }

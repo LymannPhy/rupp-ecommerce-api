@@ -6,11 +6,61 @@ use Illuminate\Http\Request;
 use App\Models\Wishlist;
 use App\Models\Product;
 use App\Http\Responses\ApiResponse;
+use App\Models\Cart;
 use App\Models\ProductFeedback;
 use Illuminate\Support\Facades\Auth;
 
 class WishlistController extends Controller
 {
+    /**
+     * Move all wishlist products to cart.
+     */
+    public function moveWishlistToCart()
+    {
+        $user = Auth::user();
+
+        // Fetch all wishlist items with product details
+        $wishlistItems = Wishlist::where('user_id', $user->id)
+            ->with('product')
+            ->get();
+
+        if ($wishlistItems->isEmpty()) {
+            return ApiResponse::error('Wishlist is empty.', [], 400);
+        }
+
+        foreach ($wishlistItems as $item) {
+            $product = $item->product;
+
+            // Check if the product exists and has stock available
+            if (!$product || $product->stock <= 0) {
+                continue; // Skip out-of-stock products
+            }
+
+            // Check if product is already in cart
+            $existingCartItem = Cart::where('user_id', $user->id)
+                ->where('product_id', $product->id)
+                ->first();
+
+            if ($existingCartItem) {
+                // Update quantity in cart
+                $existingCartItem->increment('quantity');
+            } else {
+                // Add new item to cart
+                Cart::create([
+                    'user_id' => $user->id,
+                    'product_id' => $product->id,
+                    'quantity' => 1, // Default quantity
+                    'price' => $product->price,
+                ]);
+            }
+        }
+
+        // Remove all wishlist items after adding to cart
+        Wishlist::where('user_id', $user->id)->delete();
+
+        return ApiResponse::sendResponse([], 'All wishlist items moved to cart successfully.');
+    }
+
     /**
      * Remove product from wishlist using wishlist UUID.
      */
@@ -32,7 +82,6 @@ class WishlistController extends Controller
 
         return ApiResponse::sendResponse([], 'Wishlist item removed successfully');
     }
-
 
     /**
      * Get the authenticated user's wishlist with product details.

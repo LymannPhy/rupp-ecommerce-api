@@ -39,20 +39,6 @@ class OrderController extends Controller
 
     /**
      * Get the total amount of the order before proceeding to payment.
-     * 
-     * This method calculates:
-     * - The total price of all cart items (after applying discounts).
-     * - The delivery fee based on the selected province.
-     * - If a product is a preorder, only 50% of its price is charged now.
-     * 
-     * 🚀 **Request Body (JSON)**:
-     * {
-     *   "province_uuid": "8e8a17df-1d8e-4f91-a24f-47bb3b128c11",
-     *   "coupon_code": "DISCOUNT2024"
-     * }
-     * 
-     * @param Request $request (Requires `province_uuid`, optional `coupon_code`)
-     * @return JsonResponse (Returns `cart_items`, `preorder_total`, `regular_total`, `total_price`)
      */
     public function getOrderSummary(Request $request)
     {
@@ -63,7 +49,7 @@ class OrderController extends Controller
                 'coupon_code' => 'nullable|string|exists:coupons,code',
             ]);
 
-            // 🔹 Fetch Province
+            // 🔹 Fetch Province and set delivery fee
             $province = \App\Models\Province::where('uuid', $validated['province_uuid'])->firstOrFail();
             $deliveryFee = ($province->name === 'Phnom Penh') ? 1.25 : 2.00;
 
@@ -71,9 +57,6 @@ class OrderController extends Controller
             $cartItems = Cart::join('products', 'cart.product_id', '=', 'products.id')
                 ->leftJoin('discounts', 'products.discount_id', '=', 'discounts.id')
                 ->select(
-                    'cart.product_id',
-                    'products.uuid as product_uuid',
-                    'products.name as product_name',
                     'cart.quantity',
                     'products.price',
                     'products.is_preorder',
@@ -90,72 +73,38 @@ class OrderController extends Controller
             }
 
             // ✅ Initialize totals
-            $preorderTotal = 0;
-            $regularTotal = 0;
             $totalCartValue = 0;
 
-            // 🔹 Process cart items and calculate totals
-            $processedCartItems = $cartItems->map(function ($item) use (&$preorderTotal, &$regularTotal, &$totalCartValue) {
+            // 🔹 Process cart items and calculate total price
+            foreach ($cartItems as $item) {
                 $discountedPrice = $item->price;
-                $totalDiscount = 0;
 
                 if ($item->discount_percentage > 0 && $item->is_active && now() >= $item->start_date && now() <= $item->end_date) {
                     $totalDiscount = ($item->discount_percentage / 100) * $item->price;
                     $discountedPrice = round($item->price - $totalDiscount, 2);
                 }
 
-                if ($item->is_preorder) {
-                    $totalProductPrice = round(($discountedPrice * $item->quantity) / 2, 2);
-                    $preorderTotal += $totalProductPrice;
-                } else {
-                    $totalProductPrice = round($discountedPrice * $item->quantity, 2);
-                    $regularTotal += $totalProductPrice;
-                }
+                // 🔹 Preorder products only charge 50% of the price
+                $totalProductPrice = $item->is_preorder
+                    ? round(($discountedPrice * $item->quantity) / 2, 2)
+                    : round($discountedPrice * $item->quantity, 2);
 
                 $totalCartValue += $totalProductPrice;
-
-                return [
-                    'product_uuid' => $item->product_uuid,
-                    'product_name' => $item->product_name,
-                    'quantity' => $item->quantity,
-                    'original_price' => $item->price,
-                    'discounted_price' => $discountedPrice,
-                    'total_price' => $totalProductPrice,
-                    'is_preorder' => $item->is_preorder,
-                ];
-            });
-
-            // 🔹 Apply Coupon Discount **Only If Applicable**
-            $couponDiscount = 0;
-            if (!empty($request->coupon_code)) {
-                $coupon = Coupon::where('code', $request->coupon_code)->first();
-
-                if ($coupon && $coupon->isValid()) {
-                    $couponDiscount = round(($coupon->discount_percentage / 100) * $totalCartValue, 2);
-
-                    // ✅ Ensure Preorder Discount Never Goes Negative
-                    if ($preorderTotal > 0) {
-                        $preorderTotal = max(0, round($preorderTotal - ($couponDiscount / 2), 2));
-                    }
-                    $regularTotal = max(0, round($regularTotal - ($couponDiscount / 2), 2));
-                }
             }
 
-            // ✅ Calculate Final Price
-            $totalPrice = round($preorderTotal + $regularTotal + $deliveryFee, 2);
+            // ✅ Calculate Final Total (Cart Total + Delivery Fee)
+            $finalTotal = round($totalCartValue + $deliveryFee, 2);
 
-            // ✅ Return Only Cart Items & Total Price
+            // ✅ Return Only Required Fields
             return ApiResponse::sendResponse([
-                'cart_items' => $processedCartItems,
-                'preorder_total' => $preorderTotal, 
-                'regular_total' => $regularTotal, 
-                'coupon_discount' => $couponDiscount,
+                'total_cart_value' => $totalCartValue,
                 'delivery_fee' => $deliveryFee,
-                'total_price' => $totalPrice, 
+                'final_total' => $finalTotal,
             ], 'Total amount calculated successfully.');
 
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to calculate total amount.', ['error' => $e->getMessage()], 500);
         }
     }
+
 }

@@ -16,8 +16,12 @@ return new class extends Migration
             $table->id();
             $table->uuid('uuid')->unique()->default(Str::uuid());
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->foreignId('coupon_id')->nullable()->constrained('coupons')->nullOnDelete();
             $table->decimal('total_price', 10, 2);
-            $table->string('status')->default('pending'); 
+            $table->string('status')->default('pending');
+            $table->decimal('delivery_method', 10, 2)->default(0.00);
+            $table->decimal('delivery_price', 10, 2)->default(0.00);
+            $table->date('delivery_date')->nullable(); 
             $table->timestamps();
         }); 
     }

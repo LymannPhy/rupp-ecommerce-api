@@ -107,6 +107,7 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::post('/add', [WishlistController::class, 'addToWishlist']); 
         Route::get('/', [WishlistController::class, 'getWishlist']); 
         Route::delete('/remove', [WishlistController::class, 'removeFromWishlist']);
+        Route::post('/move-to-cart', [WishlistController::class, 'moveWishlistToCart']);
     });
 
     Route::prefix('bookmarks')->group(function () {
