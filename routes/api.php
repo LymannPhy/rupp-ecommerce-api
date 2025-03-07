@@ -87,13 +87,15 @@ Route::middleware([JwtMiddleware::class])->group(function () {
     });
 
     Route::prefix('orders')->group(function () {
-        Route::post('/confirm_order', [OrderController::class, 'confirmOrder']);
         Route::post('/get-total-amount', [OrderController::class, 'getOrderSummary']);
         Route::get('/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
+        Route::get('/', [OrderController::class, 'getUserOrders']);
+        Route::post('/submit', [OrderController::class, 'submitOrder']);
     });
+    
 
     Route::prefix('payments')->group(function () {
-        Route::post('/check-payment', [PaymentController::class, 'checkPayment']);
+        Route::post('/check-payment', [PaymentController::class, 'checkMd5Hash']);
     });
 
     Route::prefix('carts')->group(function () {

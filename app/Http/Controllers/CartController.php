@@ -213,7 +213,7 @@ class CartController extends Controller
     }
 
 
-   /**
+    /**
      * Add a single product to the user's cart.
      *
      * If the product already exists in the cart, it updates the quantity.
@@ -264,10 +264,20 @@ class CartController extends Controller
                             ->first();
 
             if ($cartItem) {
-                return ApiResponse::error('Product already in cart ❌', [
-                    'product_uuid' => $product->uuid,
-                    'message' => 'This product is already in your cart. You cannot add it again.'
-                ], 400);
+                // 🔹 Increase product quantity in the cart
+                $newQuantity = $cartItem->quantity + $request->quantity;
+
+                // Ensure that the new quantity does not exceed available stock
+                if ($newQuantity > $product->stock) {
+                    return ApiResponse::error('Insufficient stock ❌', [
+                        'product_uuid' => $product->uuid,
+                        'stock' => 'Only ' . $product->stock . ' units available. You cannot add more than this.'
+                    ], 400);
+                }
+
+                $cartItem->update(['quantity' => $newQuantity]);
+
+                return ApiResponse::sendResponse([], 'Product quantity updated in cart successfully! ✅');
             }
 
             // Add new item to cart

@@ -14,6 +14,7 @@ return new class extends Migration
     {
         Schema::create('orders', function (Blueprint $table) {
             $table->id();
+            $table->string('order_code', 50)->unique();
             $table->uuid('uuid')->unique()->default(Str::uuid());
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
             $table->foreignId('coupon_id')->nullable()->constrained('coupons')->nullOnDelete();
