@@ -394,8 +394,10 @@ class BlogController extends Controller
      */
     public function show($uuid)
     {
-        // Find the blog by UUID with tags
-        $blog = Blog::where('uuid', $uuid)->with('tags')->first();
+        // Find the blog by UUID with tags, likes, and comments
+        $blog = Blog::where('uuid', $uuid)
+            ->with(['tags', 'likes', 'comments.user'])
+            ->first();
 
         if (!$blog) {
             return ApiResponse::error('Blog not found', [], 404);
@@ -404,8 +406,36 @@ class BlogController extends Controller
         // Increment views
         $blog->increment('views');
 
-        // Fetch admin user with UUID
+        // Fetch admin user details
         $admin = $blog->admin()->first(['uuid', 'name', 'email', 'avatar']);
+
+        // Count total likes and comments
+        $likesCount = $blog->likes()->count();
+        $commentsCount = $blog->comments()->count();
+
+        // Fetch the latest 5 comments with user details
+        $latestComments = $blog->comments()
+            ->with('user:id,name,avatar')
+            ->orderBy('created_at', 'desc')
+            ->take(5)
+            ->get()
+            ->map(function ($comment) {
+                return [
+                    'id' => $comment->id,
+                    'content' => $comment->content,
+                    'user' => [
+                        'id' => $comment->user->id,
+                        'name' => $comment->user->name,
+                        'avatar' => $comment->user->avatar,
+                    ],
+                    'created_at' => $comment->created_at,
+                ];
+            });
+
+        // Check if the authenticated user has liked the blog
+        $userLiked = auth()->check() 
+            ? $blog->likes()->where('user_id', auth()->id())->exists() 
+            : false;
 
         return ApiResponse::sendResponse([
             'uuid' => $blog->uuid,
@@ -418,10 +448,15 @@ class BlogController extends Controller
             'views' => $blog->views,
             'created_at' => $blog->created_at,
             'updated_at' => $blog->updated_at,
-            'tags' => $blog->tags->pluck('name')->toArray(), 
-            'admin' => $admin
+            'tags' => $blog->tags->pluck('name')->toArray(),
+            'user' => $admin,
+            'likes_count' => $likesCount,
+            'comments_count' => $commentsCount,
+            'latest_comments' => $latestComments,
+            'user_liked' => $userLiked,
         ], 'Blog details retrieved successfully');
     }
+
 
 
     /**
