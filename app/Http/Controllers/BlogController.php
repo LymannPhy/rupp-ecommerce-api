@@ -15,6 +15,47 @@ use Illuminate\Support\Str;
 
 class BlogController extends Controller
 {
+
+    /**
+     * Publish a blog by UUID.
+     *
+     * @param string $uuid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function publishBlog($uuid)
+    {
+        try {
+            // 🔹 Find blog by UUID
+            $blog = Blog::where('uuid', $uuid)->where('is_deleted', false)->first();
+
+            if (!$blog) {
+                return ApiResponse::error('Blog not found', [], 404);
+            }
+
+            // 🔹 Check if already published
+            if ($blog->status === 'published') {
+                return ApiResponse::error('Blog is already published', [], 400);
+            }
+
+            // 🔹 Update blog status to 'published' and set published_at timestamp
+            $blog->update([
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
+
+            return ApiResponse::sendResponse([
+                'uuid' => $blog->uuid,
+                'title' => $blog->title,
+                'status' => $blog->status,
+                'published_at' => $blog->published_at,
+            ], 'Blog published successfully');
+
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to publish blog', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
     /**
      * Like/Unlike a Blog Post using UUID.
      */
@@ -204,10 +245,10 @@ class BlogController extends Controller
     public function getTopBlogs()
     {
         $topBlogs = Blog::where('is_deleted', false)
-            ->where('status', 'published') // Only published blogs
-            ->orderByDesc('views') // Sort by most views
-            ->limit(10) // Get top 10
-            ->with(['admin:id,uuid,name,email,avatar']) // Load admin details
+            ->where('status', 'published') 
+            ->orderByDesc('views') 
+            ->limit(10) 
+            ->with(['admin:id,uuid,name,email,avatar'])
             ->get();
 
         // If no blogs exist, return an empty response instead of 404

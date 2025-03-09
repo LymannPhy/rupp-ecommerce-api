@@ -237,35 +237,67 @@ class ProductController extends Controller
         }
     }
 
-
-
     /**
-     * Get all discounted products with their details and discount percentage.
+     * Get all discounted products with search, filter, and pagination.
      *
+     * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getDiscountedProducts()
+    public function getDiscountedProducts(Request $request)
     {
         try {
-            // Fetch products that have an active discount
-            $discountedProducts = Product::whereNotNull('discount_id')
+            // 🔹 Validate request parameters
+            $validated = $request->validate([
+                'search' => 'nullable|string|max:255',
+                'category_id' => 'nullable|exists:categories,id',
+                'sub_category_id' => 'nullable|exists:sub_categories,id',
+                'min_price' => 'nullable|numeric|min:0',
+                'max_price' => 'nullable|numeric|min:0',
+                'page' => 'nullable|integer|min:1',
+                'page_size' => 'nullable|integer|min:1|max:100',
+            ]);
+
+            // 🔹 Fetch discounted products with filters
+            $query = Product::whereNotNull('discount_id')
                 ->where('is_deleted', false)
-                ->whereHas('discount', function ($query) {
-                    $query->where('is_active', true)
+                ->whereHas('discount', function ($q) {
+                    $q->where('is_active', true)
                         ->whereDate('start_date', '<=', now())
                         ->whereDate('end_date', '>=', now());
                 })
                 ->with([
                     'discount:id,uuid,name,discount_percentage,start_date,end_date,is_active',
                     'category:id,name',
-                ])
-                ->get();
+                ]);
 
-            if ($discountedProducts->isEmpty()) {
-                return ApiResponse::error('No discounted products found', [], 404);
+            // 🔹 Apply search filter (by product name)
+            if (!empty($validated['search'])) {
+                $query->where('name', 'LIKE', '%' . $validated['search'] . '%');
             }
 
-            // Format response data
+            // 🔹 Apply category filter
+            if (!empty($validated['category_id'])) {
+                $query->where('category_id', $validated['category_id']);
+            }
+
+            // 🔹 Apply sub-category filter (assuming sub_category_id exists in product model)
+            if (!empty($validated['sub_category_id'])) {
+                $query->where('sub_category_id', $validated['sub_category_id']);
+            }
+
+            // 🔹 Apply price range filter
+            if (!empty($validated['min_price'])) {
+                $query->where('price', '>=', $validated['min_price']);
+            }
+            if (!empty($validated['max_price'])) {
+                $query->where('price', '<=', $validated['max_price']);
+            }
+
+            // 🔹 Paginate results
+            $pageSize = $validated['page_size'] ?? 10;
+            $discountedProducts = $query->paginate($pageSize);
+
+            // 🔹 Format response data
             $responseData = $discountedProducts->map(function ($product) {
                 $discountedPrice = null;
                 $discountPercentage = 0;
@@ -291,26 +323,29 @@ class ProductController extends Controller
                 if (!is_array($allImages)) {
                     $allImages = []; // Ensure it's an array
                 }
-                $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; // Get first image
+                $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; 
 
                 return [
                     'uuid'               => $product->uuid,
                     'name'               => $product->name,
                     'description'        => $product->description,
-                    'single_image'       => $singleImage, // ✅ First image extracted
-                    'images'             => $allImages, // ✅ Remaining images
+                    'single_image'       => $singleImage, 
+                    'images'             => $allImages, 
                     'price'              => $product->price,
-                    'discount_percentage'=> $discountPercentage,
                     'discounted_price'   => $discountedPrice,
                     'stock'              => $product->stock,
                     'category'           => $product->category->name ?? null,
-                    'is_preorder'        => $product->is_preorder,
                     'created_at'         => $product->created_at,
                     'updated_at'         => $product->updated_at,
                 ];
             });
 
-            return ApiResponse::sendResponse($responseData, 'Discounted products retrieved successfully');
+            // 🔹 Use Pagination Helper to format response
+            return ApiResponse::sendResponse(
+                PaginationHelper::formatPagination($discountedProducts, $responseData),
+                'Discounted products retrieved successfully'
+            );
+
         } catch (\Exception $e) {
             return ApiResponse::error('An error occurred while fetching discounted products', [
                 'error' => $e->getMessage(),
@@ -318,7 +353,6 @@ class ProductController extends Controller
             ], 500);
         }
     }
-
 
     /**
      * Retrieve product details by UUID with discount price, top 3 highest-rated feedbacks, similar products,

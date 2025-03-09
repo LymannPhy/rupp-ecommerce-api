@@ -193,7 +193,6 @@
     
     document.getElementById('loginForm').addEventListener('submit', function(event) {
       event.preventDefault();
-      // Add your login form submission logic here
     });
   </script>
 </body>

@@ -68,6 +68,13 @@
             color: var(--primary-color);
             margin-bottom: 10px;
         }
+
+        .company-title {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary-color);
+            margin-bottom: 10px;
+        }
         
         .invoice-details {
             color: var(--text-light);
@@ -215,9 +222,10 @@
         <div class="invoice-header">
             <div class="company-details">
                 <div class="company-info">
-                    <div>123 Business Street, City</div>
+                    <div class="company-title">CAM-O2</div>
+                    <div>Chamkar Ohluk Village, Kakab 2 Commune, Por Senchey District, Phnom Penh</div>
                     <div>O2Project@proton.me</div>
-                    <div>+855 123 456 789</div>
+                    <div>(+855) 92 838 609</div>
                 </div>
             </div>
             <div class="invoice-info">
@@ -263,7 +271,6 @@
         <table>
             <thead>
                 <tr>
-                    <th style="width: 60px">Image</th>
                     <th>Product</th>
                     <th>Price</th>
                     <th>Qty</th>

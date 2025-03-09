@@ -169,6 +169,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::post('/', [BlogController::class, 'store']); 
         Route::put('/{uuid}', [BlogController::class, 'update']);
         Route::delete('/{uuid}', [BlogController::class, 'destroy']);
+        Route::patch('/{uuid}/publish', [BlogController::class, 'publishBlog']); 
     });
 
     Route::prefix('feedbacks')->group(function () {

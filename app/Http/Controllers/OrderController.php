@@ -211,17 +211,18 @@ class OrderController extends Controller
         try {
             // 🔹 Fetch the Order with related details using UUID
             $order = Order::with([
-                'details.province', // ✅ Fix: Use 'details' instead of 'orderDetail'
+                'details.province',
                 'orderItems.product' => function ($query) {
                     $query->select('id', 'uuid', 'name', 'price', 'multi_images', 'discount_id', 'is_preorder');
                 },
                 'orderItems.product.discount' => function ($query) {
                     $query->select('id', 'discount_percentage', 'is_active', 'start_date', 'end_date');
                 },
+                'coupon:id,code,discount_percentage,discount_value,discount_type',
                 'payment:id,order_id,amount'
             ])->where('uuid', $orderUuid)->firstOrFail();
 
-            // 🔹 Ensure OrderDetail Exists
+            // 🔹 Ensure Order Details Exist
             if (!$order->details) {
                 return ApiResponse::error('Order details not found.', [], 404);
             }
@@ -229,44 +230,71 @@ class OrderController extends Controller
             // 🔹 Convert `delivery_date` to Carbon instance before formatting
             $deliveryDate = $order->delivery_date ? Carbon::parse($order->delivery_date)->format('F d, Y') : 'N/A';
 
-            // 🔹 Prepare order data for rendering in Blade template
+            // ✅ Correct Calculation of Order Totals
+            $totalProductCost = 0;
+            $orderItems = $order->orderItems->map(function ($item) use (&$totalProductCost) {
+                $product = $item->product;
+
+                // Apply discount if available
+                $discountedPrice = $product->price;
+                if ($product->discount && $product->discount->is_active &&
+                    now() >= $product->discount->start_date && now() <= $product->discount->end_date) {
+                    $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
+                    $discountedPrice = round($product->price - $discountAmount, 2);
+                }
+
+                // Apply Preorder Rule (50% charge)
+                $totalItemPrice = $product->is_preorder
+                    ? round(($discountedPrice * $item->quantity) / 2, 2)
+                    : round($discountedPrice * $item->quantity, 2);
+
+                $totalProductCost += $totalItemPrice;
+
+                return [
+                    'product_uuid' => $product->uuid,
+                    'product_name' => $product->name,
+                    'quantity' => $item->quantity,
+                    'original_price' => $product->price,
+                    'discounted_price' => $discountedPrice,
+                    'total_price' => $totalItemPrice,
+                    'image' => $product->multi_images ? json_decode($product->multi_images, true)[0] ?? null : null,
+                    'is_preorder' => $product->is_preorder,
+                ];
+            });
+
+            // ✅ Apply Coupon Discount
+            $couponDiscount = 0;
+            if ($order->coupon) {
+                if (strtolower($order->coupon->discount_type) === 'percentage') {
+                    $couponDiscount = round(($order->coupon->discount_percentage / 100) * $totalProductCost, 2);
+                } elseif (strtolower($order->coupon->discount_type) === 'fixed') {
+                    $couponDiscount = min(round($order->coupon->discount_value, 2), $totalProductCost);
+                }
+            }
+
+            // ✅ Final Total Calculation
+            $finalTotal = max(round(($totalProductCost - $couponDiscount) + $order->delivery_price, 2), 0);
+
+            // 🔹 Prepare invoice data
             $invoiceData = [
                 'order' => [
                     'uuid' => $order->uuid,
                     'order_code' => $order->order_code,
-                    'sub_total_price' => $order->total_price, 
-                    'total_price' => $order->payment ? $order->payment->amount : 0,  
+                    'sub_total_price' => $totalProductCost,
+                    'total_price' => $finalTotal,
                     'delivery_price' => $order->delivery_price,
                     'status' => $order->status,
                     'delivery_method' => $order->delivery_method,
-                    'delivery_date' => $deliveryDate, // ✅ Fixed conversion
+                    'delivery_date' => $deliveryDate,
                     'created_at' => $order->created_at->format('F d, Y'),
                     'coupon' => $order->coupon ? [
                         'code' => $order->coupon->code,
                         'discount_percentage' => $order->coupon->discount_percentage,
+                        'discount_value' => $order->coupon->discount_value,
+                        'discount_type' => $order->coupon->discount_type,
+                        'applied_discount' => $couponDiscount,
                     ] : null,
-                    'items' => $order->orderItems->map(function ($item) {
-                        $product = $item->product;
-
-                        // Calculate discounted price if applicable
-                        $discountedPrice = $product->price;
-                        if ($product->discount && $product->discount->is_active &&
-                            now() >= $product->discount->start_date && now() <= $product->discount->end_date) {
-                            $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
-                            $discountedPrice = round($product->price - $discountAmount, 2);
-                        }
-
-                        return [
-                            'product_uuid' => $product->uuid,
-                            'product_name' => $product->name,
-                            'quantity' => $item->quantity,
-                            'original_price' => $product->price,
-                            'discounted_price' => $discountedPrice,
-                            'total_price' => round($item->quantity * $discountedPrice, 2),
-                            'image' => $product->multi_images ? json_decode($product->multi_images, true)[0] ?? null : null,
-                            'is_preorder' => $product->is_preorder,
-                        ];
-                    }),
+                    'items' => $orderItems,
                 ]
             ];
 
@@ -280,7 +308,6 @@ class OrderController extends Controller
             return ApiResponse::error('Something went wrong', ['details' => $e->getMessage()], 500);
         }
     }
-
 
     /**
      * Get the total amount of the order before proceeding to payment.
@@ -337,37 +364,45 @@ class OrderController extends Controller
                 $totalCartValue += $totalProductPrice;
             }
 
-            // ✅ Initialize Coupon Discount
+            // ✅ Ensure the discount percentage is never NULL
             $couponDiscount = 0.00;
 
-            // 🔹 Check if a coupon is provided and apply discount
             if (!empty($validated['coupon_code'])) {
                 $coupon = \App\Models\Coupon::where('code', $validated['coupon_code'])->first();
-
+            
                 if (!$coupon) {
                     return ApiResponse::error('Invalid or expired coupon.', [], 400);
                 }
-
+            
                 if (!$coupon->isValid()) {
                     return ApiResponse::error('Coupon is expired or inactive.', [], 400);
                 }
-
+            
                 if ($coupon->hasReachedMaxUsage()) {
                     return ApiResponse::error('This coupon has reached its maximum usage limit.', [], 400);
                 }
-
+            
                 if ($coupon->hasUserExceededLimit(auth()->id())) {
                     return ApiResponse::error('You have already used this coupon the maximum allowed times.', [], 400);
                 }
-
+            
+                // ✅ Ensure null values are treated as 0
+                $coupon->discount_percentage = $coupon->discount_percentage ?? 0;
+                $coupon->discount_value = $coupon->discount_value ?? 0;
+            
                 // ✅ Apply discount based on type
                 if (strtolower($coupon->discount_type) === 'percentage') {
-                    $couponDiscount = round(($coupon->discount_percentage / 100) * $totalCartValue, 2);
+                    $couponDiscount = round(($coupon->discount_percentage / 100) * max($totalCartValue, 0), 2);
                 } elseif (strtolower($coupon->discount_type) === 'fixed') {
                     $couponDiscount = min(round($coupon->discount_value, 2), $totalCartValue);
                 }
+            
+                // ✅ Ensure that a coupon applied with NULL discount doesn't return an error
+                if ($couponDiscount <= 0 && $totalCartValue > 0) {
+                    return ApiResponse::error('Coupon applied but does not provide any discount.', [], 400);
+                }
             }
-
+            
             // ✅ Calculate Final Total (Cart Total - Coupon Discount + Delivery Fee)
             $finalTotal = max(round(($totalCartValue - $couponDiscount) + $deliveryFee, 2), 0);
 
@@ -383,7 +418,5 @@ class OrderController extends Controller
             return ApiResponse::error('Failed to calculate total amount.', ['error' => $e->getMessage()], 500);
         }
     }
-
-
 
 }
