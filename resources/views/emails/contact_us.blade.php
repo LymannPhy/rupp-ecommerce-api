@@ -84,8 +84,9 @@
 <body>
     <div class="email-container">
         <div class="logo">
-            <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/logo-Zw4NpBL7B93493zWF6bm0pJulLIdWU.png" alt="Company Logo">
+            <img src="{{ asset('front/images/02-logo.png') }}" alt="CAM-O2 LOGO">
         </div>
+        
         
         <div class="content">
             <h1>Thank you for reaching out!</h1>

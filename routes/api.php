@@ -62,10 +62,6 @@ Route::prefix('products')->group(function () {
     Route::get('/{uuid}', [ProductController::class, 'show']);
 });
 
-Route::prefix('feedbacks')->group(function () {
-    Route::get('/promoted-feedbacks', [FeedbackController::class, 'getPromotedFeedbacks']);
-});
-
 Route::prefix('suppliers')->group(function () {
     Route::get('/{uuid}/qr-code', [SupplierController::class, 'generateSupplierQRCode']);
     Route::get('/{uuid}', [SupplierController::class, 'showSupplierProfile']);
@@ -170,12 +166,6 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::put('/{uuid}', [BlogController::class, 'update']);
         Route::delete('/{uuid}', [BlogController::class, 'destroy']);
         Route::patch('/{uuid}/publish', [BlogController::class, 'publishBlog']); 
-    });
-
-    Route::prefix('feedbacks')->group(function () {
-        Route::get('/', [FeedbackController::class, 'getAllFeedbacks']); 
-        Route::delete('/{uuid}', [FeedbackController::class, 'deleteFeedback']);
-        Route::patch('/{uuid}/status', [FeedbackController::class, 'updateFeedbackStatus']);
     });
 
     Route::prefix('contact-us')->group(function () {
