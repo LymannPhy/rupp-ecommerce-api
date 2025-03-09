@@ -260,11 +260,19 @@ class BlogController extends Controller
 
     public function getTopBlogs()
     {
+        $userId = auth()->id(); // Get the authenticated user ID
+
         $topBlogs = Blog::where('is_deleted', false)
             ->where('status', 'published') 
             ->orderByDesc('views') 
             ->limit(10)
-            ->with(['admin:id,uuid,name,email,avatar', 'tags:id,uuid,name']) // ✅ Include tags
+            ->with([
+                'admin:id,uuid,name,email,avatar', 
+                'tags:id,uuid,name',
+                'bookmarks' => function ($query) use ($userId) {
+                    $query->where('user_id', $userId); // Only fetch bookmarks for the authenticated user
+                }
+            ])
             ->get();
 
         // If no blogs exist, return an empty response instead of 404
@@ -288,12 +296,14 @@ class BlogController extends Controller
                 'tags' => $blog->tags->map(fn($tag) => [
                     'uuid' => $tag->uuid,
                     'name' => $tag->name
-                ]) // ✅ Include tags in response
+                ]),
+                'is_bookmarked' => $blog->bookmarks->isNotEmpty() // ✅ Check bookmark status
             ];
         });
 
         return ApiResponse::sendResponse($responseData, 'Top 10 blogs retrieved successfully');
     }
+
 
     /**
      * Update a blog by UUID.
@@ -398,26 +408,36 @@ class BlogController extends Controller
     }
 
 
-    /**
-     * Get all blogs that are not deleted with pagination.
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function index(Request $request)
     {
         $perPage = $request->query('per_page', 10);
+        $userId = auth()->id(); // Get the authenticated user ID
+        $tagUuids = $request->query('tags'); // Fetch tag UUIDs for filtering
 
-        $blogs = Blog::where('is_deleted', false)
-            ->with(['admin:id,uuid,name,email,avatar'])
-            ->paginate($perPage);
+        // Base query to fetch blogs
+        $query = Blog::where('is_deleted', false)
+            ->with(['admin:id,uuid,name,email,avatar', 'tags:id,uuid,name', 'bookmarks' => function ($query) use ($userId) {
+                $query->where('user_id', $userId); // Filter bookmarks for the current user
+            }]);
+
+        // Apply tag filtering if tags are provided
+        if (!empty($tagUuids)) {
+            $tagUuidArray = explode(',', $tagUuids); // Allow multiple tags in query (comma-separated)
+
+            $query->whereHas('tags', function ($q) use ($tagUuidArray) {
+                $q->whereIn('uuid', $tagUuidArray);
+            });
+        }
+
+        // Paginate results
+        $blogs = $query->paginate($perPage);
 
         if ($blogs->isEmpty()) {
             return ApiResponse::error('No blogs found', [], 404);
         }
 
-        // Format response data
-        $responseData = $blogs->map(function ($blog) {
+        // Format the response data
+        $responseData = $blogs->map(function ($blog) use ($userId) {
             return [
                 'uuid' => $blog->uuid,
                 'title' => $blog->title,
@@ -429,7 +449,11 @@ class BlogController extends Controller
                 'views' => $blog->views,
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
-                'tags' => $blog->tags->pluck('name')->toArray(),
+                'tags' => $blog->tags->map(fn($tag) => [
+                    'uuid' => $tag->uuid,
+                    'name' => $tag->name
+                ]),
+                'is_bookmark' => $blog->bookmarks->isNotEmpty(),
                 'user' => [
                     'uuid' => $blog->admin->uuid,
                     'name' => $blog->admin->name,
@@ -454,9 +478,11 @@ class BlogController extends Controller
      */
     public function show($uuid)
     {
-        // Find the blog by UUID with tags, likes, and comments
+        // Find the blog by UUID with tags, likes, comments, and bookmarks
         $blog = Blog::where('uuid', $uuid)
-            ->with(['tags', 'likes', 'comments.user'])
+            ->with(['tags', 'likes', 'comments.user', 'bookmarks' => function ($query) {
+                $query->where('user_id', auth()->id());
+            }])
             ->first();
 
         if (!$blog) {
@@ -492,6 +518,11 @@ class BlogController extends Controller
                 ];
             });
 
+        // Check if the authenticated user has bookmarked the blog
+        $isBookmarked = auth()->check() 
+            ? $blog->bookmarks->isNotEmpty() 
+            : false;
+
         // Check if the authenticated user has liked the blog
         $userLiked = auth()->check() 
             ? $blog->likes()->where('user_id', auth()->id())->exists() 
@@ -514,9 +545,9 @@ class BlogController extends Controller
             'comments_count' => $commentsCount,
             'latest_comments' => $latestComments,
             'user_liked' => $userLiked,
+            'is_bookmarked' => $isBookmarked, 
         ], 'Blog details retrieved successfully');
     }
-
 
 
     /**
