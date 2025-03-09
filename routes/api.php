@@ -44,10 +44,12 @@ Route::prefix('images')->group(function () {
 
 // Public Route
 Route::prefix('blogs')->group(function () {
+    Route::get('/tags', [BlogController::class, 'getAllTags']);
     Route::get('/top', [BlogController::class, 'getTopBlogs']);
-    Route::get('/{uuid}', [BlogController::class, 'show']); 
+    Route::get('/{uuid}', [BlogController::class, 'show']);
     Route::get('/', [BlogController::class, 'index']); 
 });
+
 
 Route::prefix('contact-us')->group(function () {
     Route::post('/', [ContactUsController::class, 'store']); 
@@ -60,6 +62,10 @@ Route::prefix('products')->group(function () {
     Route::get('/recommended', [ProductController::class, 'recommended']);
     Route::get('/preorders', [ProductController::class, 'getPreorderProducts']);
     Route::get('/{uuid}', [ProductController::class, 'show']);
+});
+
+Route::prefix('feedbacks')->group(function () {
+    Route::get('/promoted', [FeedbackController::class, 'getPromotedFeedbacks']);
 });
 
 Route::prefix('suppliers')->group(function () {
@@ -124,6 +130,10 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::get('/{uuid}/comments', [BlogController::class, 'getBlogComments']);
         Route::delete('/comment/{uuid}', [BlogController::class, 'deleteComment']);
     });
+
+    Route::prefix('feedbacks')->group(function () {
+        Route::post('/', [FeedbackController::class, 'storeFeedback']);
+    });
     
 });
 
@@ -165,7 +175,13 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::post('/', [BlogController::class, 'store']); 
         Route::put('/{uuid}', [BlogController::class, 'update']);
         Route::delete('/{uuid}', [BlogController::class, 'destroy']);
-        Route::patch('/{uuid}/publish', [BlogController::class, 'publishBlog']); 
+        Route::patch('/{uuid}/publish', [BlogController::class, 'publishBlog']);
+    });
+
+    Route::prefix('feedbacks')->group(function () {
+        Route::get('/', [FeedbackController::class, 'getAllFeedbacks']); 
+        Route::delete('/{uuid}', [FeedbackController::class, 'deleteFeedback']);
+        Route::patch('/{uuid}/status', [FeedbackController::class, 'updateFeedbackStatus']);
     });
 
     Route::prefix('contact-us')->group(function () {

@@ -15,6 +15,27 @@ use Illuminate\Support\Str;
 
 class BlogController extends Controller
 {
+    /**
+     * Load all tags.
+     */
+    public function getAllTags()
+    {
+        try {
+            $tags = Tag::all(['uuid', 'name']); 
+
+            return response()->json([
+                'success' => true,
+                'tags' => $tags
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to load tags.',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
 
     /**
      * Publish a blog by UUID.
@@ -237,18 +258,13 @@ class BlogController extends Controller
     }
 
 
-    /**
-     * Get the top 10 blogs with the most views.
-     *
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function getTopBlogs()
     {
         $topBlogs = Blog::where('is_deleted', false)
             ->where('status', 'published') 
             ->orderByDesc('views') 
-            ->limit(10) 
-            ->with(['admin:id,uuid,name,email,avatar'])
+            ->limit(10)
+            ->with(['admin:id,uuid,name,email,avatar', 'tags:id,uuid,name']) // ✅ Include tags
             ->get();
 
         // If no blogs exist, return an empty response instead of 404
@@ -268,13 +284,16 @@ class BlogController extends Controller
                 'views' => $blog->views,
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
-                'admin' => optional($blog->admin)->only(['uuid', 'name', 'email', 'avatar'])
+                'user' => optional($blog->admin)->only(['uuid', 'name', 'email', 'avatar']),
+                'tags' => $blog->tags->map(fn($tag) => [
+                    'uuid' => $tag->uuid,
+                    'name' => $tag->name
+                ]) // ✅ Include tags in response
             ];
         });
 
         return ApiResponse::sendResponse($responseData, 'Top 10 blogs retrieved successfully');
     }
-
 
     /**
      * Update a blog by UUID.
