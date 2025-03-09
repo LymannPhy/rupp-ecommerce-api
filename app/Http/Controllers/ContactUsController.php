@@ -8,6 +8,8 @@ use Illuminate\Http\Request;
 use App\Mail\ContactResponseMail;
 use App\Mail\ContactUsMail;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+
 
 class ContactUsController extends Controller
 {
@@ -61,17 +63,23 @@ class ContactUsController extends Controller
     public function store(Request $request)
     {
         // Validate request
-        $request->validate([
+        $validatedData = $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|max:255',
             'phone' => 'nullable|string|max:20',
             'message' => 'required|string',
         ]);
 
-        // Store contact request
-        $contact = ContactUs::create($request->only(['name', 'email', 'phone', 'message']));
+        // Create contact record with UUID
+        $contact = ContactUs::create([
+            'uuid' => Str::uuid(), // Ensure UUID is generated
+            'name' => $validatedData['name'],
+            'email' => $validatedData['email'],
+            'phone' => $validatedData['phone'] ?? null,
+            'message' => $validatedData['message'],
+        ]);
 
-        // Send email confirmation
+        // Attempt to send email
         try {
             Mail::to($contact->email)->send(new ContactUsMail([
                 'name' => $contact->name,
@@ -79,11 +87,31 @@ class ContactUsController extends Controller
                 'message' => $contact->message
             ]));
         } catch (\Exception $e) {
-            return ApiResponse::error('Message sent but failed to send email', ['error' => $e->getMessage()], 500);
+            return response()->json([
+                "date" => now()->format('Y-m-d H:i:s'),
+                "code" => 500,
+                "message" => "Message sent but failed to send email",
+                "errors" => [
+                    "error" => $e->getMessage(),
+                ]
+            ], 500);
         }
 
-        return ApiResponse::sendResponse($contact, 'Your message has been sent successfully.', 201);
+        // ✅ Response in the exact required format
+        return response()->json([
+            "date" => now()->format('Y-m-d H:i:s'),
+            "code" => 201,
+            "message" => "Your message has been sent successfully.",
+            "data" => [
+                "created_at" => $contact->created_at->toISOString(),
+                "name" => $contact->name,
+                "email" => $contact->email,
+                "message" => $contact->message,
+                "uuid" => $contact->uuid,
+            ]
+        ], 201);
     }
+
 
    /**
      * Get all contact messages (for admin use).
