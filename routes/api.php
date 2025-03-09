@@ -115,9 +115,8 @@ Route::middleware([JwtMiddleware::class])->group(function () {
     });
 
     Route::prefix('bookmarks')->group(function () {
-        Route::post('/', [BookmarkController::class, 'store']); 
+        Route::post('/', [BookmarkController::class, 'toggleBookmark']); 
         Route::get('/', [BookmarkController::class, 'index']); 
-        Route::delete('/{uuid}', [BookmarkController::class, 'destroy']);
     });
 
     Route::prefix('product-feedbacks')->group(function () {

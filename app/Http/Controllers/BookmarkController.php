@@ -46,39 +46,14 @@ class BookmarkController extends Controller
         return ApiResponse::sendResponse($responseData, 'User bookmarks retrieved successfully');
     }
 
-    /**
-     * Remove a bookmark (Unbookmark a blog).
-     *
-     * @param string $uuid The UUID of the bookmark.
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function destroy($uuid)
-    {
-        $userId = Auth::id();
-
-        // Find the bookmark by UUID and user_id
-        $bookmark = Bookmark::where('uuid', $uuid)
-            ->where('user_id', $userId)
-            ->first();
-
-        if (!$bookmark) {
-            return ApiResponse::error('Bookmark not found', [], 404);
-        }
-
-        // Delete the bookmark
-        $bookmark->delete();
-
-        return ApiResponse::sendResponse([], 'Blog unbookmarked successfully', 200);
-    }
-
 
     /**
-     * Add a blog to the user's bookmarks using UUID.
+     * Toggle bookmark status for a blog (bookmark or unbookmark).
      *
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function store(Request $request)
+    public function toggleBookmark(Request $request)
     {
         $request->validate([
             'blog_uuid' => 'required|exists:blogs,uuid',
@@ -89,24 +64,32 @@ class BookmarkController extends Controller
         // Find the blog by UUID
         $blog = Blog::where('uuid', $request->blog_uuid)->firstOrFail();
 
-        // Check if already bookmarked
+        // Check if the blog is already bookmarked by the user
         $existingBookmark = Bookmark::where('user_id', $userId)
             ->where('blog_id', $blog->id)
             ->first();
 
         if ($existingBookmark) {
-            return ApiResponse::error('Blog is already bookmarked', [], 400);
+            // If bookmarked, unbookmark it
+            $existingBookmark->delete();
+
+            return ApiResponse::sendResponse([
+                'blog_uuid' => $blog->uuid,
+                'is_bookmarked' => false
+            ], 'Blog unbookmarked successfully', 200);
+        } else {
+            // If not bookmarked, create a new bookmark
+            $bookmark = Bookmark::create([
+                'user_id' => $userId,
+                'blog_id' => $blog->id,
+            ]);
+
+            return ApiResponse::sendResponse([
+                'bookmark_uuid' => $bookmark->uuid ?? null,
+                'blog_uuid' => $blog->uuid,
+                'is_bookmarked' => true
+            ], 'Blog bookmarked successfully', 201);
         }
-
-        // Create new bookmark
-        $bookmark = Bookmark::create([
-            'user_id' => $userId,
-            'blog_id' => $blog->id, 
-        ]);
-
-        return ApiResponse::sendResponse([
-            'bookmark_uuid' => $bookmark->uuid ?? null,
-            'blog_uuid' => $blog->uuid,
-        ], 'Blog bookmarked successfully', 201);
     }
+
 }
