@@ -172,6 +172,10 @@ return [
          */
         'default_paper_orientation' => 'portrait',
 
+
+        'enable_remote' => true,
+
+
         /**
          * The default font family
          *

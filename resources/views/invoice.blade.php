@@ -124,13 +124,6 @@
             background-color: var(--background-light);
         }
         
-        .item-image {
-            width: 50px;
-            height: 50px;
-            object-fit: cover;
-            border-radius: 5px;
-        }
-        
         .item-name {
             font-weight: 500;
         }
@@ -221,10 +214,6 @@
         <!-- Invoice Header -->
         <div class="invoice-header">
             <div class="company-details">
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <img src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/IMG_20250208_083848_904.jpg-UGg3CE3Xi3LlJ9yIT3P5wciAnFBBBB.jpeg" alt="Company Logo" style="width: 60px; height: 60px;">
-                    <div class="company-name">CAM-O2</div>
-                </div>
                 <div class="company-info">
                     <div>123 Business Street, City</div>
                     <div>O2Project@proton.me</div>
@@ -284,13 +273,6 @@
             <tbody>
                 @foreach($order['items'] as $item)
                 <tr>
-                    <td>
-                        @if($item['image'])
-                        <img src="{{ $item['image'] }}" alt="{{ $item['product_name'] }}" class="item-image">
-                        @else
-                        <div style="width: 50px; height: 50px; background-color: #e5e7eb; border-radius: 5px;"></div>
-                        @endif
-                    </td>
                     <td>
                         <div class="item-name">
                             {{ $item['product_name'] }}
