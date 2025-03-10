@@ -9,10 +9,38 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use App\Helpers\PasswordHelper;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Auth;
 
 
 class UserController extends Controller
 {
+
+    /**
+     * Delete a user by UUID.
+     *
+     * @param string $uuid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroyByUuid(string $uuid)
+    {
+        // Check if the authenticated user is an admin
+        $user = Auth::user();
+
+        if (!$user || !$user->hasRole('admin')) {
+            return response()->json(['message' => 'Unauthorized. Only admin can delete users.'], 403);
+        }
+
+        // Attempt to delete the user by UUID
+        $deleted = User::deleteByUuid($uuid);
+
+        if ($deleted) {
+            return response()->json(['message' => 'User deleted successfully.'], 200);
+        }
+
+        return response()->json(['message' => 'User not found.'], 404);
+    }
+
+
     /**
      * Partially update user profile information.
      *

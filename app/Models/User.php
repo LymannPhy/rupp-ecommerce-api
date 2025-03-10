@@ -70,6 +70,18 @@ class User extends Authenticatable implements JWTSubject
         });
     }
 
+    /**
+     * Delete a user by UUID.
+     *
+     * @param string $uuid
+     * @return bool|null
+     */
+    public static function deleteByUuid(string $uuid): ?bool
+    {
+        return self::where('uuid', $uuid)->delete();
+    }
+
+
     public function roles()
     {
         return $this->belongsToMany(Role::class, 'role_user', 'user_id', 'role_id'); 
