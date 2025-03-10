@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use App\Models\Payment;
 
 class PaymentController extends Controller
@@ -31,8 +30,6 @@ class PaymentController extends Controller
 
             if ($response->successful()) {
                 $paymentCheck = $response->json();
-            } else {
-                Log::error("Payment check failed: " . $response->body());
             }
 
             if (isset($paymentCheck['responseCode']) && $paymentCheck['responseCode'] === 0) {
