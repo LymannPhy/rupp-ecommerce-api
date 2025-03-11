@@ -104,6 +104,7 @@ class OrderController extends Controller
                 'date' => now()->toDateTimeString(),
                 'status' => 'success',
                 'message' => 'Order placed successfully! Payment linked.',
+                'order_uuid' => $order->uuid, 
             ], 200);
 
         } catch (\Exception $e) {
