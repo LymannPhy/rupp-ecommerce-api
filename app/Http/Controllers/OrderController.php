@@ -109,6 +109,17 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
 
+            // Log detailed exception information
+            Log::error('Checkout failed', [
+                'date' => now()->toDateTimeString(),
+                'error_message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+                'user_id' => auth()->id(), 
+                'request_data' => request()->all() 
+            ]);
+
             return response()->json([
                 'date' => now()->toDateTimeString(),
                 'status' => 'error',
