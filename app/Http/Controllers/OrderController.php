@@ -108,7 +108,6 @@ class OrderController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error("Checkout error: " . $e->getMessage());
 
             return response()->json([
                 'date' => now()->toDateTimeString(),
