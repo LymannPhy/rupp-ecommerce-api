@@ -76,10 +76,6 @@ Route::prefix('suppliers')->group(function () {
 Route::get('provinces', [ProvinceController::class, 'index']);
 
 
-// Order generate invoice
-Route::get('orders/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
-
-
 //Protected Route
 Route::middleware([JwtMiddleware::class])->group(function () {
     //User Authentication
@@ -92,6 +88,9 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::post('/change-password', [UserController::class, 'changePassword']);
         Route::patch('/update-profile', [UserController::class, 'updateProfile']);
     });
+
+    // Order generate invoice
+    Route::get('orders/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
 
     Route::prefix('orders')->group(function () {
         Route::post('/get-total-amount', [OrderController::class, 'getOrderSummary']);

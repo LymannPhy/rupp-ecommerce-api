@@ -301,9 +301,16 @@ class OrderController extends Controller
                         'discount_type' => $order->coupon->discount_type,
                         'applied_discount' => $couponDiscount,
                     ] : null,
+                    'orderDetail' => $order->details ? [
+                        'address' => $order->details->address ?? 'N/A',
+                        'province' => $order->details->province ? [
+                            'name' => $order->details->province->name
+                        ] : ['name' => 'N/A'],
+                    ] : ['address' => 'N/A', 'province' => ['name' => 'N/A']],
                     'items' => $orderItems,
                 ]
             ];
+            
 
             // 🔹 Generate PDF from Blade view
             $pdf = Pdf::loadView('invoice', $invoiceData);
