@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 class BookmarkController extends Controller
 {
     /**
-     * Get all bookmarks of the authenticated user.
+     * Get all bookmarks of the authenticated user with blog tags, views, and likes.
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -19,9 +19,12 @@ class BookmarkController extends Controller
     {
         $userId = Auth::id();
 
-        // Fetch all bookmarks with blog details
+        // Fetch all bookmarks with blog details, tags, views, and likes
         $bookmarks = Bookmark::where('user_id', $userId)
-            ->with(['blog:id,uuid,title,image,status,published_at'])
+            ->with(['blog' => function ($query) {
+                $query->select('id', 'uuid', 'title', 'image', 'status', 'published_at', 'views')
+                    ->with(['tags:id,name', 'likes']);
+            }])
             ->get();
 
         if ($bookmarks->isEmpty()) {
@@ -38,6 +41,9 @@ class BookmarkController extends Controller
                     'image' => $bookmark->blog->image,
                     'status' => $bookmark->blog->status,
                     'published_at' => $bookmark->blog->published_at,
+                    'views' => $bookmark->blog->views,
+                    'like_count' => $bookmark->blog->likes->count(),
+                    'tags' => $bookmark->blog->tags->pluck('name'),
                 ],
                 'created_at' => $bookmark->created_at,
             ];
@@ -45,7 +51,6 @@ class BookmarkController extends Controller
 
         return ApiResponse::sendResponse($responseData, 'User bookmarks retrieved successfully');
     }
-
 
     /**
      * Toggle bookmark status for a blog (bookmark or unbookmark).
