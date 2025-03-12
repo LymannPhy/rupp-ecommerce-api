@@ -94,7 +94,7 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::get('/', [OrderController::class, 'getUserOrders']);
         Route::post('/submit', [OrderController::class, 'submitOrder']);
         Route::get('/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
-        Route::get('/payment-invoice/{orderUuid}', [OrderController::class, 'generateUserPaymentInvoicePDF']);
+        Route::get('/payment-invoice/{orderUuid}', [OrderController::class, 'getUserPaymentInvoiceData']);
     });
 
     Route::prefix('payments')->group(function () {
