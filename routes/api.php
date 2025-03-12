@@ -89,15 +89,13 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::patch('/update-profile', [UserController::class, 'updateProfile']);
     });
 
-    // Order generate invoice
-    Route::get('orders/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
-
     Route::prefix('orders')->group(function () {
         Route::post('/get-total-amount', [OrderController::class, 'getOrderSummary']);
         Route::get('/', [OrderController::class, 'getUserOrders']);
         Route::post('/submit', [OrderController::class, 'submitOrder']);
+        Route::get('/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
+        Route::get('/payment-invoice/{orderUuid}', [OrderController::class, 'generateUserPaymentInvoicePDF']);
     });
-    
 
     Route::prefix('payments')->group(function () {
         Route::post('/check-payment', [PaymentController::class, 'checkMd5Hash']);

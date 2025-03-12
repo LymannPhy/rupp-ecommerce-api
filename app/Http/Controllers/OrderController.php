@@ -8,7 +8,6 @@ use App\Models\Cart;
 use App\Models\Order;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Log;
 use App\Models\OrderDetail;
 use App\Models\OrderItem;
 use App\Models\Payment;
@@ -18,6 +17,59 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
+    /**
+     * Generate and download a user payment invoice as PDF.
+     *
+     * @param string $orderUuid The UUID of the order.
+     * @return BinaryFileResponse
+     */
+    public function generateUserPaymentInvoicePDF($orderUuid)
+    {
+        try {
+            // Fetch the order with related payment information
+            $order = Order::with(['payment'])
+                ->where('uuid', $orderUuid)
+                ->firstOrFail();
+
+            // Ensure payment exists for the order
+            if (!$order->payment) {
+                return response()->json(['message' => 'Payment information not found for this order.'], 404);
+            }
+
+            // Prepare invoice data
+            $invoiceData = [
+                'order_code' => $order->order_code,
+                'from_account' => $order->payment->from_account_id,
+                'to_account' => $order->payment->to_account_id,
+                'amount' => $order->payment->amount,
+                'payment_date' => Carbon::parse($order->payment->created_at)->format('F d, Y'),
+                'transaction_place' => $order->payment->transaction_place,
+            ];
+
+            // Define custom paper size: [width, height] in inches (8.27 x 5.83 for A5 landscape)
+            $customPaper = [0, 0, 595.28, 600];// Width x Height in points (A4 size)
+
+            // Generate PDF with limited height
+            $pdf = Pdf::loadView('invoice', $invoiceData)
+                ->setPaper($customPaper, 'portrait') // 'portrait' or 'landscape'
+                ->setOptions([
+                    'dpi' => 72,
+                    'defaultFont' => 'sans-serif',
+                    'isHtml5ParserEnabled' => true,
+                    'isRemoteEnabled' => true,
+                ]);
+
+            // Stream the PDF (for smaller size, avoid download)
+            return $pdf->stream("payment_invoice_{$order->order_code}.pdf");
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Something went wrong',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
     public function submitOrder(Request $request)
     {
         try {
@@ -313,10 +365,10 @@ class OrderController extends Controller
             
 
             // 🔹 Generate PDF from Blade view
-            $pdf = Pdf::loadView('invoice', $invoiceData);
+            $pdf = Pdf::loadView('invoice_details', $invoiceData);
 
             // 🔹 Return the PDF as a Download
-            return $pdf->download("invoice_{$order->uuid}.pdf");
+            return $pdf->download("invoice_details_{$order->uuid}.pdf");
 
         } catch (\Exception $e) {
             return ApiResponse::error('Something went wrong', ['details' => $e->getMessage()], 500);
