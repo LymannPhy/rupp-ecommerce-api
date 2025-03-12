@@ -23,7 +23,7 @@ class BookmarkController extends Controller
         $bookmarks = Bookmark::where('user_id', $userId)
             ->with(['blog' => function ($query) {
                 $query->select('id', 'uuid', 'title', 'image', 'status', 'published_at', 'views')
-                    ->with(['tags:id,name', 'likes']);
+                    ->with(['tags:id,uuid,name', 'likes']);
             }])
             ->get();
 
@@ -43,7 +43,12 @@ class BookmarkController extends Controller
                     'published_at' => $bookmark->blog->published_at,
                     'views' => $bookmark->blog->views,
                     'like_count' => $bookmark->blog->likes->count(),
-                    'tags' => $bookmark->blog->tags->pluck('name'),
+                    'tags' => $bookmark->blog->tags->map(function ($tag) {
+                        return [
+                            'uuid' => $tag->uuid,
+                            'name' => $tag->name,
+                        ];
+                    }),
                 ],
                 'created_at' => $bookmark->created_at,
             ];
@@ -51,6 +56,7 @@ class BookmarkController extends Controller
 
         return ApiResponse::sendResponse($responseData, 'User bookmarks retrieved successfully');
     }
+
 
     /**
      * Toggle bookmark status for a blog (bookmark or unbookmark).
