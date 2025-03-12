@@ -141,8 +141,7 @@ class FeedbackController extends Controller
     {
         // Validate the incoming request
         $validated = $request->validate([
-            'message' => 'required|string|max:1000',
-            'type' => 'required|in:suggestion,bug_report,complaint,other',
+            'message' => 'required|string|max:1000'
         ]);
 
         try {
@@ -150,14 +149,12 @@ class FeedbackController extends Controller
             $feedback = Feedback::create([
                 'user_id' => Auth::id(), 
                 'message' => $validated['message'],
-                'type' => $validated['type'],
             ]);
 
             // Return a success response
             return ApiResponse::sendResponse([
                 'uuid' => $feedback->uuid,
                 'message' => $feedback->message,
-                'type' => $feedback->type,
             ], 'Feedback submitted successfully!');
         } catch (\Exception $e) {
             // Handle any errors and rollback
