@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\Auth;
 class BookmarkController extends Controller
 {
     /**
-     * Get all bookmarks of the authenticated user with blog tags, views, and likes.
+     * Get all bookmarks of the authenticated user with blog tags, views, likes, and bookmark status.
      *
      * @return \Illuminate\Http\JsonResponse
      */
@@ -21,9 +21,11 @@ class BookmarkController extends Controller
 
         // Fetch all bookmarks with blog details, tags, views, and likes
         $bookmarks = Bookmark::where('user_id', $userId)
-            ->with(['blog' => function ($query) {
+            ->with(['blog' => function ($query) use ($userId) {
                 $query->select('id', 'uuid', 'title', 'image', 'status', 'published_at', 'views')
-                    ->with(['tags:id,uuid,name', 'likes']);
+                    ->with(['tags:id,uuid,name', 'likes', 'bookmarks' => function ($q) use ($userId) {
+                        $q->where('user_id', $userId);
+                    }]);
             }])
             ->get();
 
@@ -32,7 +34,7 @@ class BookmarkController extends Controller
         }
 
         // Format response
-        $responseData = $bookmarks->map(function ($bookmark) {
+        $responseData = $bookmarks->map(function ($bookmark) use ($userId) {
             return [
                 'uuid' => $bookmark->uuid,
                 'blog' => [
@@ -43,6 +45,7 @@ class BookmarkController extends Controller
                     'published_at' => $bookmark->blog->published_at,
                     'views' => $bookmark->blog->views,
                     'like_count' => $bookmark->blog->likes->count(),
+                    'is_bookmarked' => $bookmark->blog->bookmarks->isNotEmpty(),
                     'tags' => $bookmark->blog->tags->map(function ($tag) {
                         return [
                             'uuid' => $tag->uuid,
