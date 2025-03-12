@@ -17,23 +17,29 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
+
     /**
-     * Generate and download a user payment invoice as PDF.
+     * Get user payment invoice data as JSON.
      *
      * @param string $orderUuid The UUID of the order.
-     * @return BinaryFileResponse
+     * @return JsonResponse
      */
-    public function generateUserPaymentInvoicePDF($orderUuid)
+    public function getUserPaymentInvoiceData($orderUuid)
     {
         try {
             // Fetch the order with related payment information
             $order = Order::with(['payment'])
                 ->where('uuid', $orderUuid)
-                ->firstOrFail();
+                ->first();
+
+            // Handle case where order is not found
+            if (!$order) {
+                return ApiResponse::error('Order not found.', [], 404);
+            }
 
             // Ensure payment exists for the order
             if (!$order->payment) {
-                return response()->json(['message' => 'Payment information not found for this order.'], 404);
+                return ApiResponse::error('Payment information not found for this order.', [], 404);
             }
 
             // Prepare invoice data
@@ -46,29 +52,15 @@ class OrderController extends Controller
                 'transaction_place' => $order->payment->transaction_place,
             ];
 
-            // Define custom paper size: [width, height] in inches (8.27 x 5.83 for A5 landscape)
-            $customPaper = [0, 0, 595.28, 600];// Width x Height in points (A4 size)
-
-            // Generate PDF with limited height
-            $pdf = Pdf::loadView('invoice', $invoiceData)
-                ->setPaper($customPaper, 'portrait') // 'portrait' or 'landscape'
-                ->setOptions([
-                    'dpi' => 72,
-                    'defaultFont' => 'sans-serif',
-                    'isHtml5ParserEnabled' => true,
-                    'isRemoteEnabled' => true,
-                ]);
-
-            // Stream the PDF (for smaller size, avoid download)
-            return $pdf->stream("payment_invoice_{$order->order_code}.pdf");
+            // Send successful response using ApiResponse class
+            return ApiResponse::sendResponse($invoiceData, 'Invoice data retrieved successfully.');
 
         } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Something went wrong',
-                'error' => $e->getMessage()
-            ], 500);
+            // Handle and return any unexpected error
+            return ApiResponse::error('Something went wrong.', ['error' => $e->getMessage()], 500);
         }
     }
+
 
     public function submitOrder(Request $request)
     {
