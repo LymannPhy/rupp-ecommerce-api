@@ -18,6 +18,7 @@ use Endroid\QrCode\QrCode;
 use Endroid\QrCode\Writer\PngWriter;
 use Endroid\QrCode\Encoding\Encoding;
 use Endroid\QrCode\ErrorCorrectionLevel;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\URL;
 
 class ProductController extends Controller
@@ -534,32 +535,31 @@ class ProductController extends Controller
         }
     }
 
-    /**
-     * Soft delete a product by UUID.
-     * 
-     * This method marks a product as "deleted" instead of permanently removing it 
-     * from the database. This helps preserve stock data and allows for potential restoration.
-     *
-     * @param string $uuid The UUID of the product to delete.
-     * @return \Illuminate\Http\JsonResponse
-     */
     public function destroy($uuid)
     {
         try {
+            // Fetch the product by UUID
             $product = Product::where('uuid', $uuid)->first();
 
             if (!$product) {
                 return ApiResponse::error('Product not found', [], 404);
             }
 
-            $product->update(['is_deleted' => true]);
+            DB::beginTransaction();
 
-            return ApiResponse::sendResponse([], '🗑️ Product removed from listing but stock is preserved.');
+            // Permanently delete the product
+            $product->forceDelete();
+
+            DB::commit();
+
+            return ApiResponse::sendResponse([], '🗑️ Product has been permanently deleted.');
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return ApiResponse::error('Failed to delete product', ['error' => $e->getMessage()], 500);
         }
     }
+
 
     /**
      * Update an existing product by UUID.
