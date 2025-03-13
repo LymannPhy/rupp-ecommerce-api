@@ -436,8 +436,8 @@ class BlogController extends Controller
             'youtube_videos' => 'nullable|array',
             'youtube_videos.*' => 'url',
             'status' => 'nullable|in:draft,published',
-            'tags' => 'nullable|array', // ✅ Tags should be an array
-            'tags.*' => 'string|max:50' // ✅ Each tag should be a string
+            'tags' => 'nullable|array',
+            'tags.*' => 'string|max:50'
         ]);
 
         // ✅ Find the blog by UUID
@@ -459,17 +459,15 @@ class BlogController extends Controller
             // ✅ Process Tags if provided
             if ($request->has('tags')) {
                 $tagIds = [];
-
                 foreach ($request->tags as $tagName) {
-                    $tag = Tag::firstOrCreate(['name' => $tagName]); // Find or create the tag
+                    $tag = Tag::firstOrCreate(['name' => $tagName], ['uuid' => Str::uuid()]);
                     $tagIds[] = $tag->id;
                 }
-
                 $blog->tags()->sync($tagIds); // ✅ Sync tags (add/remove as needed)
             }
 
-            // ✅ Fetch admin user with UUID
-            $admin = $blog->admin()->first(['uuid', 'name', 'email']);
+            // ✅ Fetch user details with UUID
+            $user = $blog->user()->first(['uuid', 'name', 'email']);
 
             // ✅ Commit transaction
             DB::commit();
@@ -484,8 +482,8 @@ class BlogController extends Controller
                 'published_at' => $blog->published_at,
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
-                'tags' => $blog->tags->pluck('name')->toArray(), // ✅ Return tags as an array
-                'admin' => $admin
+                'tags' => $blog->tags->pluck('name')->toArray(),
+                'user' => $user
             ], 'Blog updated successfully');
             
         } catch (\Exception $e) {
@@ -494,6 +492,7 @@ class BlogController extends Controller
             return ApiResponse::error('Failed to update blog', ['error' => $e->getMessage()], 500);
         }
     }
+
 
     /**
      * Soft delete a blog by UUID.
@@ -592,7 +591,6 @@ class BlogController extends Controller
      */
     public function show($uuid)
     {
-        // Find the blog by UUID with tags, likes, comments, and bookmarks
         $blog = Blog::where('uuid', $uuid)
             ->with(['tags', 'likes', 'comments.user', 'bookmarks' => function ($query) {
                 $query->where('user_id', auth()->id());
@@ -606,8 +604,8 @@ class BlogController extends Controller
         // Increment views
         $blog->increment('views');
 
-        // Fetch admin user details
-        $admin = $blog->admin()->first(['uuid', 'name', 'email', 'avatar']);
+        // Fetch user details (previously called as admin)
+        $user = $blog->user()->first(['uuid', 'name', 'email', 'avatar']);
 
         // Count total likes and comments
         $likesCount = $blog->likes()->count();
@@ -654,7 +652,7 @@ class BlogController extends Controller
             'created_at' => $blog->created_at,
             'updated_at' => $blog->updated_at,
             'tags' => $blog->tags->pluck('name')->toArray(),
-            'user' => $admin,
+            'user' => $user,
             'likes_count' => $likesCount,
             'comments_count' => $commentsCount,
             'latest_comments' => $latestComments,
@@ -662,6 +660,7 @@ class BlogController extends Controller
             'is_bookmarked' => $isBookmarked, 
         ], 'Blog details retrieved successfully');
     }
+
 
 
     /**
