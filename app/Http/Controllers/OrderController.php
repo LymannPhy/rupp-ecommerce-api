@@ -13,6 +13,9 @@ use App\Models\OrderItem;
 use App\Models\Payment;
 use App\Models\Province;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Http\Exceptions\HttpResponseException;
 
 
 class OrderController extends Controller
@@ -222,6 +225,9 @@ class OrderController extends Controller
             // 🔹 Clear User Cart
             Cart::where('user_id', auth()->id())->delete();
 
+            // ✅ Send Telegram Alert
+            $this->sendTelegramAlert($order, $validated);
+
             DB::commit();
 
             return response()->json([
@@ -247,6 +253,49 @@ class OrderController extends Controller
             ], 500);
         }
         
+    }
+
+    /**
+     * Send order alert to Telegram Bot
+     *
+     * @param $order
+     * @param $validated
+     * @throws HttpResponseException
+     */
+    private function sendTelegramAlert($order, $validated)
+    {
+        $telegramToken = env('TELEGRAM_BOT_TOKEN'); 
+        $chatId = env('TELEGRAM_CHAT_ID');         
+
+        $message = "📦 *New Order Alert!*\n"
+            . "*Order Code:* {$order->order_code}\n"
+            . "*User Email:* {$validated['email']}\n"
+            . "*Phone Number:* {$validated['phone_number']}\n"
+            . "*Total Price:* {$validated['final_total']} USD\n"
+            . "*Delivery Date:* {$order->delivery_date}\n"
+            . "*Address:* {$validated['current_address']}\n"
+            . "*Remarks:* " . (isset($validated['remarks']) ? $validated['remarks'] : 'N/A');
+
+        $url = "https://api.telegram.org/bot{$telegramToken}/sendMessage";
+
+        $response = Http::withOptions(['verify' => false])->post($url, [
+            'chat_id' => $chatId,
+            'text' => $message,
+            'parse_mode' => 'Markdown'
+        ]);
+
+        if ($response->failed()) {
+            Log::error('Telegram alert failed', ['response' => $response->body()]);
+
+            // Throw an exception if the Telegram alert fails
+            throw new HttpResponseException(response()->json([
+                'status' => 'error',
+                'message' => 'Failed to send order alert to Telegram.',
+                'telegram_error' => $response->body()
+            ], 500));
+        }
+
+        Log::info('Telegram alert sent successfully!', ['response' => $response->body()]);
     }
 
 
