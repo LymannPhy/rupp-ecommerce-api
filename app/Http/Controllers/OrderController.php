@@ -55,7 +55,7 @@ class OrderController extends Controller
             $formattedOrder = [
                 'uuid' => $order->uuid,
                 'order_code' => $order->order_code,
-                'delivery_price' => $order->delivery_price,
+                'delivery_fee' => $order->delivery_fee,
                 'sub_total_price' => $order->total_price,
                 'total_price' => $order->payment ? $order->payment->amount : 0,
                 'status' => $order->status,
