@@ -17,6 +17,86 @@ use Illuminate\Support\Facades\DB;
 
 class OrderController extends Controller
 {
+    /**
+     * Get a specific order of the authenticated user by UUID.
+     *
+     * @param string $uuid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getUserOrderByUuid($uuid)
+    {
+        try {
+            $user = auth()->user();
+
+            if (!$user) {
+                return ApiResponse::error('Unauthorized ❌', ['error' => 'User not authenticated'], 401);
+            }
+
+            // 🔹 Fetch the specific order with related data
+            $order = Order::where('user_id', $user->id)
+                ->where('uuid', $uuid)
+                ->with([
+                    'orderItems.product' => function ($query) {
+                        $query->select('id', 'uuid', 'name', 'price', 'multi_images', 'discount_id', 'is_preorder');
+                    },
+                    'orderItems.product.discount' => function ($query) {
+                        $query->select('id', 'discount_percentage', 'is_active', 'start_date', 'end_date');
+                    },
+                    'coupon:id,code,discount_percentage',
+                    'payment:id,order_id,amount'
+                ])
+                ->first();
+
+            if (!$order) {
+                return ApiResponse::error('Order not found ❌', [], 404);
+            }
+
+            // 🔹 Format the response data
+            $formattedOrder = [
+                'uuid' => $order->uuid,
+                'order_code' => $order->order_code,
+                'delivery_price' => $order->delivery_price,
+                'sub_total_price' => $order->total_price,
+                'total_price' => $order->payment ? $order->payment->amount : 0,
+                'status' => $order->status,
+                'delivery_method' => $order->delivery_method,
+                'delivery_date' => $order->delivery_date,
+                'created_at' => $order->created_at->format('Y-m-d H:i:s'),
+                'coupon' => $order->coupon ? [
+                    'code' => $order->coupon->code,
+                    'discount_percentage' => $order->coupon->discount_percentage,
+                ] : null,
+                'items' => $order->orderItems->map(function ($item) {
+                    $product = $item->product;
+
+                    // Calculate discounted price if applicable
+                    $discountedPrice = $product->price;
+                    if ($product->discount && $product->discount->is_active &&
+                        now() >= $product->discount->start_date && now() <= $product->discount->end_date) {
+                        $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
+                        $discountedPrice = round($product->price - $discountAmount, 2);
+                    }
+
+                    return [
+                        'product_uuid' => $product->uuid,
+                        'product_name' => $product->name,
+                        'quantity' => $item->quantity,
+                        'original_price' => $product->price,
+                        'discounted_price' => $discountedPrice,
+                        'total_price' => round($item->quantity * $discountedPrice, 2),
+                        'is_preorder' => $product->is_preorder,
+                        'image' => $product->multi_images ? json_decode($product->multi_images, true)[0] ?? null : null,
+                    ];
+                }),
+            ];
+
+            return ApiResponse::sendResponse($formattedOrder, 'User order retrieved successfully ✅');
+            
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to retrieve order 🔥', ['error' => $e->getMessage()], 500);
+        }
+    }
+
 
     /**
      * Get user payment invoice data as JSON.

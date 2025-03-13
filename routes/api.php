@@ -84,6 +84,7 @@ Route::middleware([JwtMiddleware::class])->group(function () {
     Route::prefix('orders')->group(function () {
         Route::post('/get-total-amount', [OrderController::class, 'getOrderSummary']);
         Route::get('/', [OrderController::class, 'getUserOrders']);
+        Route::get('/{uuid}', [OrderController::class, 'getUserOrderByUuid']);
         Route::post('/submit', [OrderController::class, 'submitOrder']);
         Route::get('/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
         Route::get('/payment-invoice/{orderUuid}', [OrderController::class, 'getUserPaymentInvoiceData']);
