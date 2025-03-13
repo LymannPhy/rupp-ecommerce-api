@@ -15,10 +15,15 @@ return new class extends Migration {
             $table->text('content'); 
             $table->string('image')->nullable(); 
             $table->json('youtube_videos')->nullable(); 
-            $table->foreignId('admin_id')->constrained('users')->onDelete('cascade'); 
+            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->enum('status', ['draft', 'published', 'archived'])->default('draft'); 
             $table->timestamp('published_at')->nullable(); 
             $table->unsignedBigInteger('views')->default(0)->comment('Number of times the blog has been viewed'); 
+            $table->boolean('is_awarded')->nullable()->default(false);
+            $table->timestamp('awarded_at')->nullable();
+            $table->foreignId('awarded_by')->nullable()->constrained('users')->onDelete('set null');
+            $table->enum('award_type', ['best_content', 'most_viewed', 'most_liked'])->nullable();
+            $table->enum('award_rank', ['1', '2', '3'])->nullable();
             $table->boolean('is_deleted')->default(false); 
             $table->timestamps(); 
         });

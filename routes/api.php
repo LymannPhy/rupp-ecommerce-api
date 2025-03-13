@@ -43,14 +43,6 @@ Route::prefix('images')->group(function () {
 
 
 // Public Route
-Route::prefix('blogs')->group(function () {
-    Route::get('/tags', [BlogController::class, 'getAllTags']);
-    Route::get('/top', [BlogController::class, 'getTopBlogs']);
-    Route::get('/{uuid}', [BlogController::class, 'show']);
-    Route::get('/', [BlogController::class, 'index']); 
-});
-
-
 Route::prefix('contact-us')->group(function () {
     Route::post('/', [ContactUsController::class, 'store']); 
 });
@@ -125,6 +117,10 @@ Route::middleware([JwtMiddleware::class])->group(function () {
     });
 
     Route::prefix('blogs')->group(function () { 
+        Route::post('/', [BlogController::class, 'store']); 
+        Route::put('/{uuid}', [BlogController::class, 'update']);
+        Route::delete('/{uuid}', [BlogController::class, 'destroy']);
+        Route::patch('/{uuid}/publish', [BlogController::class, 'publishBlog']);
         Route::post('/{uuid}/like', [BlogController::class, 'likeBlog']); 
         Route::post('/{uuid}/comment', [BlogController::class, 'commentOnBlog']);
         Route::get('/{uuid}/comments', [BlogController::class, 'getBlogComments']);
@@ -172,13 +168,6 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::delete('/{uuid}', [ProductController::class, 'destroy']);
     });
 
-    Route::prefix('blogs')->group(function () {
-        Route::post('/', [BlogController::class, 'store']); 
-        Route::put('/{uuid}', [BlogController::class, 'update']);
-        Route::delete('/{uuid}', [BlogController::class, 'destroy']);
-        Route::patch('/{uuid}/publish', [BlogController::class, 'publishBlog']);
-    });
-
     Route::prefix('feedbacks')->group(function () {
         Route::get('/', [FeedbackController::class, 'getAllFeedbacks']); 
         Route::delete('/{uuid}', [FeedbackController::class, 'deleteFeedback']);
@@ -203,5 +192,18 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     });
     
     
+    Route::prefix('blogs')->group(function () { 
+        Route::get('/top-engagement', [BlogController::class, 'getTopBlogsByEngagement']);
+        // ✅ Route for admin to confirm and give awards with rank
+        Route::post('/{uuid}/award', [BlogController::class, 'confirmAward']);
+        
+    });
+    
 });
 
+Route::prefix('blogs')->group(function () {
+    Route::get('/tags', [BlogController::class, 'getAllTags']);
+    Route::get('/top', [BlogController::class, 'getTopBlogs']);
+    Route::get('/{uuid}', [BlogController::class, 'show']);
+    Route::get('/', [BlogController::class, 'index']); 
+});

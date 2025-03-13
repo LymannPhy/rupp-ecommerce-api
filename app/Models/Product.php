@@ -87,4 +87,10 @@ class Product extends Model
         return $this->belongsTo(Supplier::class);
     }
 
+    // Define the relationship with OrderItem
+    public function orderItems()
+    {
+        return $this->hasMany(OrderItem::class, 'product_id');
+    }
+
 }

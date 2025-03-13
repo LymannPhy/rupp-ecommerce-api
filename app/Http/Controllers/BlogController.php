@@ -12,9 +12,115 @@ use App\Models\BlogComment;
 use App\Models\BlogLike;
 use App\Models\Tag;
 use Illuminate\Support\Str;
+use Exception;
 
 class BlogController extends Controller
 {
+    public function getTopBlogsByEngagement()
+    {
+        $userId = auth()->id(); // Get the authenticated user ID
+
+        // Fetch top 10 blogs based on views and likes
+        $topBlogs = Blog::where('is_deleted', false)
+            ->where('status', 'published')
+            ->withCount('likes') // Count likes for sorting
+            ->with([
+                'user:id,uuid,name,email,avatar',
+                'tags:id,uuid,name',
+                'bookmarks' => function ($query) use ($userId) {
+                    $query->where('user_id', $userId); // Filter bookmarks for the current user
+                }
+            ])
+            ->orderByDesc('views')
+            ->orderByDesc('likes_count')
+            ->limit(10)
+            ->get();
+
+        if ($topBlogs->isEmpty()) {
+            return ApiResponse::sendResponse([], 'No top blogs available');
+        }
+
+        $responseData = $topBlogs->map(function ($blog) {
+            return [
+                'uuid' => $blog->uuid,
+                'title' => $blog->title,
+                'content' => $blog->content,
+                'image' => $blog->image,
+                'youtube_videos' => $blog->youtube_videos,
+                'status' => $blog->status,
+                'published_at' => $blog->published_at,
+                'views' => $blog->views,
+                'likes' => $blog->likes_count,
+                'created_at' => $blog->created_at,
+                'updated_at' => $blog->updated_at,
+                'tags' => $blog->tags->map(fn($tag) => [
+                    'uuid' => $tag->uuid,
+                    'name' => $tag->name
+                ]),
+                'is_bookmarked' => $blog->bookmarks->isNotEmpty(),
+                'user' => optional($blog->user)->only(['uuid', 'name', 'email', 'avatar'])
+            ];
+        });
+
+        return ApiResponse::sendResponse($responseData, 'Top 10 blogs by engagement retrieved successfully');
+    }
+
+    // Method for admin to confirm and award the blog
+    public function confirmAward(Request $request, $uuid)
+    {
+        $request->validate([
+            'award_type' => 'required|in:best_content,most_viewed,most_liked',
+            'award_rank' => 'required|in:1,2,3',
+        ]);
+
+        try {
+            $blog = Blog::where('uuid', $uuid)->first();
+
+            if (!$blog) {
+                return ApiResponse::error('Blog not found.', [], 404);
+            }
+
+            if ($blog->is_awarded && $blog->award_rank === $request->award_rank) {
+                return ApiResponse::error('This blog has already been awarded this rank.', [], 400);
+            }
+
+            // Ensure only admins can award
+            if (!Auth::user() || !Auth::user()->hasRole('admin')) {
+                return ApiResponse::error('Only admins can confirm awards.', [], 403);
+            }
+
+            // Check if this rank is already taken for this award type
+            $existingAward = Blog::where('award_type', $request->award_type)
+                ->where('award_rank', $request->award_rank)
+                ->first();
+
+            if ($existingAward) {
+                return ApiResponse::error("Rank {$request->award_rank} has already been assigned for this award type.", [], 400);
+            }
+
+            $blog->update([
+                'is_awarded' => true,
+                'awarded_at' => now(),
+                'awarded_by' => Auth::id(),
+                'award_type' => $request->award_type,
+                'award_rank' => $request->award_rank,
+            ]);
+
+            return ApiResponse::sendResponse([
+                'uuid' => $blog->uuid,
+                'title' => $blog->title,
+                'is_awarded' => $blog->is_awarded,
+                'awarded_at' => $blog->awarded_at,
+                'awarded_by' => $blog->awardedBy?->only(['uuid', 'name', 'email']),
+                'award_type' => $blog->award_type,
+                'award_rank' => $blog->award_rank,
+            ], "🏆 Blog has been awarded successfully as Rank {$blog->award_rank}!");
+            
+        } catch (Exception $e) {
+            return ApiResponse::rollback('Failed to award the blog.', ['error' => $e->getMessage()]);
+        }
+    }
+
     /**
      * Load all tags.
      */
@@ -262,20 +368,22 @@ class BlogController extends Controller
     {
         $userId = auth()->id(); // Get the authenticated user ID
 
+        // Fetch blogs with top award ranks (1 to 3)
         $topBlogs = Blog::where('is_deleted', false)
-            ->where('status', 'published') 
-            ->orderByDesc('views') 
-            ->limit(10)
+            ->where('status', 'published')
+            ->whereNotNull('award_rank') // Only fetch awarded blogs
+            ->orderBy('award_rank') // Order by rank (1, 2, 3)
             ->with([
-                'admin:id,uuid,name,email,avatar', 
+                'user:id,uuid,name,email,avatar',
                 'tags:id,uuid,name',
+                'awardedBy:id,uuid,name,email', // Include awarding admin
                 'bookmarks' => function ($query) use ($userId) {
                     $query->where('user_id', $userId); // Only fetch bookmarks for the authenticated user
                 }
             ])
             ->get();
 
-        // If no blogs exist, return an empty response instead of 404
+        // If no blogs exist, return an empty response
         if ($topBlogs->isEmpty()) {
             return ApiResponse::sendResponse([], 'No top blogs available');
         }
@@ -292,16 +400,22 @@ class BlogController extends Controller
                 'views' => $blog->views,
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
-                'user' => optional($blog->admin)->only(['uuid', 'name', 'email', 'avatar']),
                 'tags' => $blog->tags->map(fn($tag) => [
                     'uuid' => $tag->uuid,
                     'name' => $tag->name
                 ]),
-                'is_bookmarked' => $blog->bookmarks->isNotEmpty() // ✅ Check bookmark status
+                'is_bookmarked' => $blog->bookmarks->isNotEmpty(),
+                'user' => optional($blog->user)->only(['uuid', 'name', 'email', 'avatar']),
+                'award' => [
+                    'type' => $blog->award_type,
+                    'rank' => $blog->award_rank,
+                    'awarded_at' => $blog->awarded_at,
+                    'awarded_by' => optional($blog->awardedBy)->only(['uuid', 'name', 'email']),
+                ]
             ];
         });
 
-        return ApiResponse::sendResponse($responseData, 'Top 10 blogs retrieved successfully');
+        return ApiResponse::sendResponse($responseData, 'Top awarded blogs retrieved successfully');
     }
 
 
@@ -416,7 +530,7 @@ class BlogController extends Controller
 
         // Base query to fetch blogs
         $query = Blog::where('is_deleted', false)
-            ->with(['admin:id,uuid,name,email,avatar', 'tags:id,uuid,name', 'bookmarks' => function ($query) use ($userId) {
+            ->with(['user:id,uuid,name,email,avatar', 'tags:id,uuid,name', 'bookmarks' => function ($query) use ($userId) {
                 $query->where('user_id', $userId); // Filter bookmarks for the current user
             }]);
 
@@ -455,10 +569,10 @@ class BlogController extends Controller
                 ]),
                 'is_bookmark' => $blog->bookmarks->isNotEmpty(),
                 'user' => [
-                    'uuid' => $blog->admin->uuid,
-                    'name' => $blog->admin->name,
-                    'email' => $blog->admin->email,
-                    'avatar' => $blog->admin->avatar
+                    'uuid' => $blog->user?->uuid,
+                    'name' => $blog->user?->name,
+                    'email' => $blog->user?->email,
+                    'avatar' => $blog->user?->avatar
                 ]
             ];
         });
@@ -558,51 +672,47 @@ class BlogController extends Controller
      */
     public function store(Request $request)
     {
-        // ✅ Validate input including tags
+        // Check if the authenticated user is an admin
+        if (Auth::user()->hasRole('admin')) {
+            return ApiResponse::error('🚫 Admins are not allowed to create blogs.', [], 403);
+        }
+
         $request->validate([
             'title' => 'required|string|max:255',
             'content' => 'required|string',
             'image' => 'nullable|string',
             'youtube_videos' => 'nullable|array',
             'youtube_videos.*' => 'url',
-            'tags' => 'nullable|array', 
-            'tags.*' => 'string|max:50' 
+            'tags' => 'nullable|array',
+            'tags.*' => 'string|max:50'
         ]);
 
-        // ✅ Start a database transaction
         DB::beginTransaction();
 
         try {
-            // ✅ Create a blog post
             $blog = Blog::create([
                 'uuid' => Str::uuid(),
                 'title' => $request->title,
                 'content' => $request->content,
                 'image' => $request->image,
                 'youtube_videos' => $request->youtube_videos ?? [],
-                'admin_id' => Auth::id(),
+                'user_id' => Auth::id(),  
                 'status' => 'draft',
             ]);
 
-            // ✅ Process Tags
             if ($request->has('tags')) {
                 $tagIds = [];
-
                 foreach ($request->tags as $tagName) {
-                    // ✅ Ensure UUID is set when creating a new tag
                     $tag = Tag::firstOrCreate(['name' => $tagName], [
                         'uuid' => Str::uuid() 
                     ]);
                     $tagIds[] = $tag->id;
                 }
-
                 $blog->tags()->sync($tagIds); 
             }
 
-            // ✅ Fetch admin details
-            $admin = $blog->admin()->first(['uuid', 'name', 'email']);
+            $user = $blog->user()->first(['uuid', 'name', 'email']);
 
-            // ✅ Commit transaction
             DB::commit();
 
             return ApiResponse::sendResponse([
@@ -615,8 +725,8 @@ class BlogController extends Controller
                 'published_at' => $blog->published_at,
                 'created_at' => $blog->created_at,
                 'updated_at' => $blog->updated_at,
-                'tags' => $blog->tags->pluck('name')->toArray(), 
-                'user' => $admin
+                'tags' => $blog->tags->pluck('name')->toArray(),
+                'user' => $user
             ], '🎉 Blog created successfully!', 201);
 
         } catch (\Exception $e) {

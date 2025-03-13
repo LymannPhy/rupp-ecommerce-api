@@ -11,12 +11,15 @@ class Blog extends Model
     use HasFactory;
 
     protected $fillable = [
-        'uuid', 'title', 'content', 'image', 'youtube_videos', 'admin_id', 'status', 'published_at', 'is_deleted', 'views'
+        'uuid', 'title', 'content', 'image', 'youtube_videos', 'user_id', 'status', 
+        'published_at', 'is_deleted', 'views', 'is_awarded', 'awarded_at', 'awarded_by', 'award_type', 'award_rank'
     ];
 
     protected $casts = [
-        'youtube_videos' => 'array', 
+        'youtube_videos' => 'array',
         'published_at' => 'datetime',
+        'awarded_at' => 'datetime',
+        'is_awarded' => 'boolean'
     ];
 
     protected static function boot()
@@ -32,9 +35,14 @@ class Blog extends Model
         return $this->hasMany(Bookmark::class);
     }
 
-    public function admin()
+    public function user()
     {
-        return $this->belongsTo(User::class, 'admin_id');
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function awardedBy()
+    {
+        return $this->belongsTo(User::class, 'awarded_by');
     }
 
     public function tags()
