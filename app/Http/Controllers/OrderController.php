@@ -278,24 +278,23 @@ class OrderController extends Controller
 
         $url = "https://api.telegram.org/bot{$telegramToken}/sendMessage";
 
+        // Send the message to Telegram
         $response = Http::withOptions(['verify' => false])->post($url, [
             'chat_id' => $chatId,
             'text' => $message,
             'parse_mode' => 'Markdown'
         ]);
 
+        // Throw an exception if the Telegram alert fails
         if ($response->failed()) {
-            Log::error('Telegram alert failed', ['response' => $response->body()]);
+            $errorDetails = $response->json();
 
-            // Throw an exception if the Telegram alert fails
             throw new HttpResponseException(response()->json([
                 'status' => 'error',
                 'message' => 'Failed to send order alert to Telegram.',
-                'telegram_error' => $response->body()
+                'telegram_error' => $errorDetails
             ], 500));
         }
-
-        Log::info('Telegram alert sent successfully!', ['response' => $response->body()]);
     }
 
 
