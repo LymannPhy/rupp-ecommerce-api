@@ -17,7 +17,6 @@ return new class extends Migration
             $table->string('order_code', 50)->unique();
             $table->uuid('uuid')->unique()->default(Str::uuid());
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->foreignId('coupon_id')->nullable()->constrained('coupons')->nullOnDelete();
             $table->decimal('total_price', 10, 2);
             $table->string('status')->default('pending');
             $table->decimal('delivery_method', 10, 2)->default(0.00);
