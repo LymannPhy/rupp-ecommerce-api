@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminStatisticController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuthController;
@@ -199,6 +200,12 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::post('/{uuid}/award', [BlogController::class, 'confirmAward']);
         
     });
+
+    Route::prefix('admin')->group(function () {
+        Route::get('/statistics', [AdminStatisticController::class, 'index']);
+        Route::get('/dashboard-stats', [AdminStatisticController::class, 'getDashboardStats']);
+    });
+    
     
 });
 
