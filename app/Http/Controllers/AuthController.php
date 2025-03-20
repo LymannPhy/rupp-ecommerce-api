@@ -18,7 +18,6 @@ use App\Models\Role;
 
 class AuthController extends Controller
 {
-
     /**
      * Log out the authenticated user by revoking tokens.
      *

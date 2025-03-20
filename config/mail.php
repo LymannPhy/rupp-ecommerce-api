@@ -44,6 +44,7 @@ return [
             'password' => env('MAIL_PASSWORD'),
             'timeout' => null,
             'local_domain' => env('MAIL_EHLO_DOMAIN'),
+            'log_channel' => env('MAIL_LOG_CHANNEL', 'stack'),
         ],
 
         'ses' => [

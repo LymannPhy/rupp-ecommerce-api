@@ -33,7 +33,7 @@ class UserSeeder extends Seeder
             ], [
                 'uuid' => Str::uuid()->toString(),
                 'name' => $faker->name,
-                'password' => Hash::make('password123'),  // Default password for all users
+                'password' => Hash::make('password123'),  
                 'is_verified' => true,
             ]);
 
@@ -47,7 +47,7 @@ class UserSeeder extends Seeder
         ], [
             'uuid' => Str::uuid()->toString(),
             'name' => 'kdeylester',
-            'password' => Hash::make('password123'),  // Default password for the specified user
+            'password' => Hash::make('password123'), 
             'is_verified' => true,
         ]);
 
