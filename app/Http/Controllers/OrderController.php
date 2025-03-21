@@ -366,7 +366,9 @@ class OrderController extends Controller
                             'discounted_price' => $discountedPrice, 
                             'total_price' => round($item->quantity * $discountedPrice, 2),
                             'is_preorder' => $product->is_preorder,
-                            'image' => $product->multi_images ? json_decode($product->multi_images, true)[0] ?? null : null,
+                            'image' => $product->multi_images 
+                            ? (is_string($product->multi_images) ? json_decode($product->multi_images, true) : $product->multi_images)[0] ?? null 
+                            : null,
                         ];
                     }),
                 ];
