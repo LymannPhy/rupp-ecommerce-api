@@ -141,6 +141,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::get('/', [UserController::class, 'getAllUsers']);
         Route::get('{uuid}', [UserController::class, 'getUserByUuid']);
         Route::delete('{uuid}', [UserController::class, 'destroyByUuid']);
+        Route::patch('/block/{uuid}', [UserController::class, 'toggleBlockUserByUuid']);
     });
 
     Route::prefix('categories')->group(function () {

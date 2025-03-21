@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\PaginationHelper;
 use App\Models\User;
 use App\Http\Resources\UserResource;
 use App\Http\Responses\ApiResponse;
@@ -14,6 +15,41 @@ use Illuminate\Support\Facades\Auth;
 
 class UserController extends Controller
 {
+    /**
+     * Toggle the block status of a user by UUID (Admin Only).
+     *
+     * @param string $uuid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toggleBlockUserByUuid(string $uuid)
+    {
+        try {
+            // Ensure the authenticated user is an admin
+            $user = auth()->user();
+
+            if (!$user || !$user->hasRole('admin')) {
+                return ApiResponse::error('Unauthorized ❌', ['error' => 'Only admin can block/unblock users.'], 403);
+            }
+
+            // Find the user by UUID
+            $userToToggle = User::where('uuid', $uuid)->first();
+
+            if (!$userToToggle) {
+                return ApiResponse::error('User not found ❌', ['error' => 'No user found with this UUID'], 404);
+            }
+
+            // Toggle the user's block status
+            $userToToggle->is_blocked = !$userToToggle->is_blocked;
+            $userToToggle->save();
+
+            $status = $userToToggle->is_blocked ? 'blocked' : 'unblocked';
+
+            return ApiResponse::sendResponse([], "User has been $status successfully ✅");
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to toggle block status 🔥', ['error' => $e->getMessage()], 500);
+        }
+    }
+
 
     /**
      * Delete a user by UUID.
@@ -159,12 +195,12 @@ class UserController extends Controller
     }
 
 
-   /**
-     * Load all users except admins (Admins Only).
+    /**
+     * Load all users except admins (Admins Only) with pagination, search, and filter.
      *
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getAllUsers()
+    public function getAllUsers(Request $request)
     {
         try {
             $user = auth()->user();
@@ -174,16 +210,42 @@ class UserController extends Controller
                 return ApiResponse::throw('Forbidden', ['error' => 'You are not authorized to access this resource'], 403);
             }
 
-            // Fetch users excluding those with the 'admin' role
-            $users = User::whereDoesntHave('roles', function ($query) {
+            // Define the base query for users excluding the 'admin' role
+            $query = User::whereDoesntHave('roles', function ($query) {
                 $query->where('name', 'admin');
-            })->get();
+            });
 
-            return ApiResponse::sendResponse(UserResource::collection($users), 'Users retrieved successfully.');
+            // Apply search filters for username and email
+            if ($request->has('search') && $request->search) {
+                $searchTerm = $request->search;
+                $query->where(function($q) use ($searchTerm) {
+                    $q->where('username', 'LIKE', "%$searchTerm%")
+                    ->orWhere('email', 'LIKE', "%$searchTerm%");
+                });
+            }
+
+            // Apply filters for 'is_blocked' if provided
+            if ($request->has('is_blocked')) {
+                $query->where('is_blocked', $request->is_blocked);
+            }
+
+            // Apply sorting by 'created_at' (either ascending or descending)
+            $sortDirection = $request->get('sort_direction', 'desc'); // Default to descending order
+            $query->orderBy('created_at', $sortDirection);
+
+            // Apply pagination
+            $perPage = $request->get('per_page', 15); // Default to 15 items per page
+            $users = $query->paginate($perPage);
+
+            // Format the pagination response
+            $formattedUsers = PaginationHelper::formatPagination($users, UserResource::collection($users));
+
+            return ApiResponse::sendResponse($formattedUsers, 'Users retrieved successfully.');
         } catch (\Exception $e) {
             return ApiResponse::throw('Failed to retrieve users', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 
     /**
