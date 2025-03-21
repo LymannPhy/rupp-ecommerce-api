@@ -685,7 +685,7 @@ class ProductController extends Controller
                 }
 
                 // Process images
-                $allImages = json_decode($product->multi_images, true) ?? [];
+                $allImages = is_array($product->multi_images) ? $product->multi_images : json_decode($product->multi_images, true) ?? [];
                 $singleImage = count($allImages) > 0 ? $allImages[0] : null;
                 $multiImages = count($allImages) > 1 ? array_slice($allImages, 1) : [];
 

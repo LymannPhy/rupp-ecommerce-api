@@ -237,15 +237,24 @@ class UserController extends Controller
             $perPage = $request->get('per_page', 15); // Default to 15 items per page
             $users = $query->paginate($perPage);
 
-            // Format the pagination response
-            $formattedUsers = PaginationHelper::formatPagination($users, UserResource::collection($users));
+            // Format the response without pagination metadata
+            $data = UserResource::collection($users);  // Transform the paginated results
 
-            return ApiResponse::sendResponse($formattedUsers, 'Users retrieved successfully.');
+            // Manually generate next page URL
+            $nextPageUrl = $users->hasMorePages() ? $users->nextPageUrl() : null;
+
+            // Return response without pagination metadata
+            $response = [
+                'data' => $data,
+                'next_page_url' => $nextPageUrl,  // Only include next page URL
+            ];
+
+            return ApiResponse::sendResponse($response, 'Users retrieved successfully.');
+            
         } catch (\Exception $e) {
             return ApiResponse::throw('Failed to retrieve users', ['error' => $e->getMessage()], 500);
         }
     }
-
 
 
     /**
