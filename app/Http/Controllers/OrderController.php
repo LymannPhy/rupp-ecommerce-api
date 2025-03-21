@@ -341,7 +341,7 @@ class OrderController extends Controller
                     'total_price' => $order->payment ? $order->payment->amount : 0, 
                     'status' => $order->status,
                     'delivery_method' => $order->delivery_method,
-                    'delivery_date' => $order->delivery_date ? $order->delivery_date->format('Y-m-d H:i:s') : null,  
+                    'delivery_date' => $order->delivery_date ? $order->delivery_date->format('Y-m-d') : null,  
                     'created_at' => $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : null,  
                     'coupon' => $order->coupon ? [
                         'code' => $order->coupon->code,
