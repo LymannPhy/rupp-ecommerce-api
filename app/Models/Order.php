@@ -38,7 +38,10 @@ class Order extends Model
     }
 
     protected $casts = [
-        'total_price' => 'decimal:2'
+        'total_price' => 'decimal:2',
+        'delivery_date' => 'datetime',  
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime',
     ];
 
     // Relationship: Order belongs to a User
