@@ -126,9 +126,9 @@ class CategoryController extends Controller
         }
     }
 
-
+    
     /**
-     * Retrieve a category by UUID.
+     * Retrieve a category by UUID (with subcategories if it's a parent).
      *
      * @param string $uuid
      * @return \Illuminate\Http\JsonResponse
@@ -136,27 +136,42 @@ class CategoryController extends Controller
     public function show($uuid)
     {
         try {
-            // Find category by UUID
-            $category = Category::where('uuid', $uuid)->first();
+            // 🔍 Find category by UUID and eager load subcategories
+            $category = Category::with('subcategories')
+                ->where('uuid', $uuid)
+                ->first();
 
-            // If category not found, return a 404 response
+            // ❌ If category not found, return a 404 response
             if (!$category) {
                 return ApiResponse::error('Category not found', [], 404);
             }
 
-            // Return category data without ID
-            return ApiResponse::sendResponse([
+            // ✅ Format category with subcategories if any
+            $formattedCategory = [
                 'uuid' => $category->uuid,
                 'name' => $category->name,
                 'is_deleted' => $category->is_deleted,
                 'created_at' => $category->created_at,
                 'updated_at' => $category->updated_at,
-            ], 'Category retrieved successfully ✅');
+                'subcategories' => $category->subcategories->map(function ($sub) {
+                    return [
+                        'uuid' => $sub->uuid,
+                        'name' => $sub->name,
+                        'is_deleted' => $sub->is_deleted,
+                        'created_at' => $sub->created_at,
+                        'updated_at' => $sub->updated_at,
+                    ];
+                }),
+            ];
+
+            // ✅ Return success response
+            return ApiResponse::sendResponse($formattedCategory, 'Category retrieved successfully ✅');
         } catch (\Exception $e) {
-            // Handle any unexpected errors
+            // ⚠️ Handle any unexpected errors
             return ApiResponse::error('Failed to retrieve category', ['error' => $e->getMessage()], 500);
         }
     }
+
 
     /**
      * Get all categories with their subcategories.
