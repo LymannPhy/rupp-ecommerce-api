@@ -12,6 +12,30 @@ use Carbon\Carbon;
 class CouponController extends Controller
 {
     /**
+     * Delete a coupon by UUID.
+     *
+     * @param string $uuid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function destroy($uuid)
+    {
+        try {
+            $coupon = Coupon::where('uuid', $uuid)->first();
+
+            if (!$coupon) {
+                return ApiResponse::error('Coupon not found ❌', [], 404);
+            }
+
+            $coupon->delete();
+
+            return ApiResponse::sendResponse([], 'Coupon deleted successfully 🗑️');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to delete coupon', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
+    /**
      * Retrieve a coupon by UUID.
      *
      * @param string $uuid

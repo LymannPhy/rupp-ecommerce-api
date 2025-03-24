@@ -89,7 +89,6 @@ class AuthController extends Controller
     }
 
 
-
     /**
      * Request a password reset by sending a reset code via email.
      *
@@ -163,7 +162,6 @@ class AuthController extends Controller
     }
 
 
-    
     /**
      * Resend a new verification code to the user's email.
      *
