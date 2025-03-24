@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\PaginationHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Storage;
@@ -122,14 +123,19 @@ class DiscountController extends Controller
     }
 
     /**
-     * Retrieve all discounts.
+     * Retrieve all discounts with pagination.
      *
      * @return \Illuminate\Http\JsonResponse
      */
     public function index()
     {
         try {
-            $discounts = Discount::all()->map(function ($discount) {
+            // 📦 Get paginated discounts (default 10 per page or from query param)
+            $perPage = request()->get('per_page', 10);
+            $discounts = Discount::paginate($perPage);
+
+            // 🔄 Format each discount
+            $formattedDiscounts = $discounts->getCollection()->map(function ($discount) {
                 return [
                     'uuid' => $discount->uuid,
                     'name' => $discount->name,
@@ -142,13 +148,17 @@ class DiscountController extends Controller
                     'created_at' => $discount->created_at,
                     'updated_at' => $discount->updated_at,
                 ];
-            });
+            })->toArray();
 
-            return ApiResponse::sendResponse($discounts, 'Discounts loaded successfully ✅');
+            // 🧭 Add pagination metadata
+            $response = PaginationHelper::formatPagination($discounts, $formattedDiscounts);
+
+            return ApiResponse::sendResponse($response, 'Discounts loaded successfully ✅');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to load discounts', ['error' => $e->getMessage()], 500);
         }
     }
+
 
     /**
      * Store a newly created discount.

@@ -163,6 +163,9 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
 
     Route::prefix('coupons')->group(function () {
         Route::post('/', [CouponController::class, 'store']);
+        Route::get('/', [CouponController::class, 'index']);
+        Route::get('/{uuid}', [CouponController::class, 'show']);
+
     });
 
     Route::prefix('products')->group(function () {

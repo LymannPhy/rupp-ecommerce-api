@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\PaginationHelper;
 use Illuminate\Http\Request;
 use App\Models\Category;
 use App\Http\Responses\ApiResponse;
@@ -20,7 +21,7 @@ class CategoryController extends Controller
         // Validate request data
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|unique:categories,name|max:255',
-            'parent_uuid' => 'required|exists:categories,uuid', // Ensure parent exists
+            'parent_uuid' => 'required|exists:categories,uuid', 
         ]);
 
         // If validation fails, return a 422 response
@@ -34,9 +35,9 @@ class CategoryController extends Controller
 
             // Create subcategory under parent category
             $subcategory = Category::create([
-                'uuid' => (string) \Illuminate\Support\Str::uuid(), // Generate unique UUID
+                'uuid' => (string) \Illuminate\Support\Str::uuid(), 
                 'name' => $request->name,
-                'parent_id' => $parentCategory->id, // Assign as a subcategory
+                'parent_id' => $parentCategory->id, 
             ]);
 
             // Return response with created subcategory data
@@ -126,7 +127,7 @@ class CategoryController extends Controller
         }
     }
 
-    
+
     /**
      * Retrieve a category by UUID (with subcategories if it's a parent).
      *
@@ -136,38 +137,43 @@ class CategoryController extends Controller
     public function show($uuid)
     {
         try {
-            // 🔍 Find category by UUID and eager load subcategories
-            $category = Category::with('subcategories')
-                ->where('uuid', $uuid)
-                ->first();
+            // 🔍 Find the category by UUID
+            $category = Category::where('uuid', $uuid)->first();
 
-            // ❌ If category not found, return a 404 response
             if (!$category) {
                 return ApiResponse::error('Category not found', [], 404);
             }
 
-            // ✅ Format category with subcategories if any
+            // 📦 Paginate subcategories (default 10 per page or use request param)
+            $perPage = request()->get('per_page', 10);
+            $subcategories = $category->subcategories()->paginate($perPage);
+
+            // 🔄 Format subcategories
+            $formattedSubcategories = $subcategories->getCollection()->map(function ($sub) {
+                return [
+                    'uuid' => $sub->uuid,
+                    'name' => $sub->name,
+                    'is_deleted' => $sub->is_deleted,
+                    'created_at' => $sub->created_at,
+                    'updated_at' => $sub->updated_at,
+                ];
+            })->toArray();
+
+            // 🧭 Add pagination metadata
+            $formattedWithPagination = PaginationHelper::formatPagination($subcategories, $formattedSubcategories);
+
+            // ✅ Format main category
             $formattedCategory = [
                 'uuid' => $category->uuid,
                 'name' => $category->name,
                 'is_deleted' => $category->is_deleted,
                 'created_at' => $category->created_at,
                 'updated_at' => $category->updated_at,
-                'subcategories' => $category->subcategories->map(function ($sub) {
-                    return [
-                        'uuid' => $sub->uuid,
-                        'name' => $sub->name,
-                        'is_deleted' => $sub->is_deleted,
-                        'created_at' => $sub->created_at,
-                        'updated_at' => $sub->updated_at,
-                    ];
-                }),
+                'subcategories' => $formattedWithPagination, // 👈 Paginated response
             ];
 
-            // ✅ Return success response
             return ApiResponse::sendResponse($formattedCategory, 'Category retrieved successfully ✅');
         } catch (\Exception $e) {
-            // ⚠️ Handle any unexpected errors
             return ApiResponse::error('Failed to retrieve category', ['error' => $e->getMessage()], 500);
         }
     }
@@ -211,7 +217,6 @@ class CategoryController extends Controller
             return ApiResponse::error('Failed to load categories', ['error' => $e->getMessage()], 500);
         }
     }
-
 
 
    /**

@@ -12,6 +12,66 @@ use Carbon\Carbon;
 class CouponController extends Controller
 {
     /**
+     * Retrieve a coupon by UUID.
+     *
+     * @param string $uuid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function show($uuid)
+    {
+        try {
+            $coupon = Coupon::where('uuid', $uuid)->first();
+
+            if (!$coupon) {
+                return ApiResponse::error('Coupon not found', [], 404);
+            }
+
+            return ApiResponse::sendResponse([
+                'uuid' => $coupon->uuid,
+                'code' => $coupon->code,
+                'discount_percentage' => $coupon->discount_percentage,
+                'start_date' => $coupon->start_date,
+                'end_date' => $coupon->end_date,
+                'is_active' => $coupon->is_active,
+            ], 'Coupon retrieved successfully ✅');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to retrieve coupon', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
+    /**
+     * Retrieve all coupons with pagination.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function index()
+    {
+        try {
+            $perPage = request()->get('per_page', 10);
+            $coupons = Coupon::paginate($perPage);
+
+            $formattedCoupons = $coupons->getCollection()->map(function ($coupon) {
+                return [
+                    'uuid' => $coupon->uuid,
+                    'code' => $coupon->code,
+                    'discount_percentage' => $coupon->discount_percentage,
+                    'start_date' => $coupon->start_date,
+                    'end_date' => $coupon->end_date,
+                    'is_active' => $coupon->is_active,
+                ];
+            })->toArray();
+
+            $response = \App\Helpers\PaginationHelper::formatPagination($coupons, $formattedCoupons);
+
+            return ApiResponse::sendResponse($response, 'Coupons loaded successfully ✅');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to load coupons', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
+    /**
      * Store a newly created coupon.
      *
      * @param Request $request
