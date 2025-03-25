@@ -16,7 +16,6 @@ class Feedback extends Model
         'uuid',
         'user_id',
         'message',
-        'type',
         'status',
     ];
 

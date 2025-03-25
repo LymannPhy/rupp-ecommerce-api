@@ -13,7 +13,6 @@ return new class extends Migration {
             $table->uuid('uuid')->unique()->default(Str::uuid()); 
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->text('message')->comment('User feedback message');
-            $table->enum('type', ['suggestion', 'bug_report', 'complaint', 'other'])->default('other');
             $table->enum('status', ['pending', 'promoted'])->default('pending')->comment('Feedback status');
             $table->timestamps();
         });

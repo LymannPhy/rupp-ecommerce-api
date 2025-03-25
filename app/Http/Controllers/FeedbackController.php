@@ -82,7 +82,6 @@ class FeedbackController extends Controller
                     'username' => $feedback->user->name,
                     'avatar' => $feedback->user->avatar ?? null, // If avatar exists in the user model
                     'message' => $feedback->message,
-                    'type' => $feedback->type,
                     'status' => $feedback->status,
                     'created_at' => $feedback->created_at->toDateTimeString(),
                 ];
@@ -115,7 +114,6 @@ class FeedbackController extends Controller
                     'username' => $feedback->user->name,
                     'avatar' => $feedback->user->avatar ?? null, // If avatar exists in the user model
                     'message' => $feedback->message,
-                    'type' => $feedback->type,
                     'status' => $feedback->status ?? 'Pending', // Default status to Pending if null
                     'created_at' => $feedback->created_at->toDateTimeString(),
                 ];
