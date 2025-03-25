@@ -16,7 +16,7 @@ use Exception;
 
 class BlogController extends Controller
 {
-    public function disableBlogByUuid(string $uuid)
+    public function toggleBlogStatusByUuid(string $uuid)
     {
         try {
             // 🔍 Find blog by UUID
@@ -27,22 +27,25 @@ class BlogController extends Controller
                 return ApiResponse::error('Blog not found ❌', ['uuid' => $uuid], 404);
             }
 
-            // 🔁 If already disabled, return info
-            if ($blog->is_deleted) {
-                return ApiResponse::sendResponse(null, 'Blog is already disabled ⚠️');
-            }
+            // 🔁 Toggle the is_deleted status
+            $blog->update(['is_deleted' => !$blog->is_deleted]);
 
-            // ✅ Mark the blog as deleted (soft-delete)
-            $blog->update(['is_deleted' => true]);
+            // ✅ Respond with the new status
+            $status = $blog->is_deleted ? 'disabled' : 'enabled';
+            $message = "Blog {$status} successfully ✅";
 
-            return ApiResponse::sendResponse(null, 'Blog disabled successfully ✅');
+            return ApiResponse::sendResponse([
+                'uuid' => $blog->uuid,
+                'is_deleted' => $blog->is_deleted,
+            ], $message);
 
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed to disable blog ❌', [
+            return ApiResponse::error('Failed to toggle blog status ❌', [
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
+
 
     public function getTopTenBlogs()
     {

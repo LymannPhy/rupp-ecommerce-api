@@ -166,6 +166,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::get('/', [CouponController::class, 'index']);
         Route::get('/{uuid}', [CouponController::class, 'show']);
         Route::delete('/{uuid}', [CouponController::class, 'destroy']);
+        Route::put('/{uuid}', [CouponController::class, 'update']);
     });
 
     Route::prefix('products')->group(function () {
@@ -203,8 +204,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         // ✅ Route for admin to confirm and give awards with rank
         Route::post('/{uuid}/award', [BlogController::class, 'confirmAward']);
         Route::get('/topTen', [BlogController::class, 'getTopTenBlogs']);
-        Route::patch('/{uuid}/disable', [BlogController::class, 'disableBlogByUuid']);
-        
+        Route::patch('/{uuid}/toggle', [BlogController::class, 'toggleBlogStatusByUuid']);
     });
 
     Route::prefix('admin')->group(function () {
