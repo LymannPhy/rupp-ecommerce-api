@@ -63,7 +63,6 @@ class CouponController extends Controller
         }
     }
 
-
     /**
      * Retrieve all coupons with pagination.
      *
@@ -127,13 +126,13 @@ class CouponController extends Controller
             // Create a new coupon with UUID
             $coupon = Coupon::create([
                 'uuid' => Str::uuid(),
-                'code' => strtoupper($request->code), // Ensure coupon codes are stored in uppercase
+                'code' => strtoupper($request->code), 
                 'discount_percentage' => $request->discount_percentage,
                 'max_usage' => $request->max_usage,
                 'user_limit' => $request->user_limit,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
-                'is_active' => $request->is_active ?? true, // Default to active
+                'is_active' => $request->is_active ?? true,
             ]);
 
             // Return the created coupon response
