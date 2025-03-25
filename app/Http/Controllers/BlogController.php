@@ -594,33 +594,28 @@ class BlogController extends Controller
     public function index(Request $request)
     {
         $perPage = $request->query('per_page', 10);
-        $userId = auth()->id(); // Get the authenticated user ID
-        $tagUuids = $request->query('tags'); // Fetch tag UUIDs for filtering
+        $userId = auth()->id();
+        $tagUuids = $request->query('tags');
 
-        // Base query to fetch blogs
         $query = Blog::where('is_deleted', false)
-            ->with(['user:id,uuid,name,email,avatar', 'tags:id,uuid,name', 'bookmarks' => function ($query) use ($userId) {
-                $query->where('user_id', $userId); // Filter bookmarks for the current user
-            }]);
+            ->with([
+                'user:id,uuid,name,email,avatar',
+                'tags:id,uuid,name',
+                'bookmarks' => fn($q) => $q->where('user_id', $userId)
+            ]);
 
-        // Apply tag filtering if tags are provided
         if (!empty($tagUuids)) {
-            $tagUuidArray = explode(',', $tagUuids); // Allow multiple tags in query (comma-separated)
-
-            $query->whereHas('tags', function ($q) use ($tagUuidArray) {
-                $q->whereIn('uuid', $tagUuidArray);
-            });
+            $tagUuidArray = explode(',', $tagUuids);
+            $query->whereHas('tags', fn($q) => $q->whereIn('uuid', $tagUuidArray));
         }
 
-        // Paginate results
         $blogs = $query->paginate($perPage);
 
-        if ($blogs->isEmpty()) {
+        if ($blogs->total() === 0) {
             return ApiResponse::error('No blogs found', [], 404);
         }
 
-        // Format the response data
-        $responseData = $blogs->map(function ($blog) use ($userId) {
+        $responseData = $blogs->getCollection()->map(function ($blog) use ($userId) {
             return [
                 'uuid' => $blog->uuid,
                 'title' => $blog->title,
@@ -634,14 +629,14 @@ class BlogController extends Controller
                 'updated_at' => $blog->updated_at,
                 'tags' => $blog->tags->map(fn($tag) => [
                     'uuid' => $tag->uuid,
-                    'name' => $tag->name
+                    'name' => $tag->name,
                 ]),
                 'is_bookmark' => $blog->bookmarks->isNotEmpty(),
                 'user' => [
                     'uuid' => $blog->user?->uuid,
                     'name' => $blog->user?->name,
                     'email' => $blog->user?->email,
-                    'avatar' => $blog->user?->avatar
+                    'avatar' => $blog->user?->avatar,
                 ]
             ];
         });
