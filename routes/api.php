@@ -122,7 +122,7 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::post('/', [BlogController::class, 'store']); 
         Route::put('/{uuid}', [BlogController::class, 'update']);
         Route::delete('/{uuid}', [BlogController::class, 'destroy']);
-        Route::patch('/{uuid}/publish', [BlogController::class, 'publishBlog']);
+        Route::patch('/{uuid}/toggle', [BlogController::class, 'togglePublishBlog']);
         Route::post('/{uuid}/like', [BlogController::class, 'likeBlog']); 
         Route::post('/{uuid}/comment', [BlogController::class, 'commentOnBlog']);
         Route::get('/{uuid}/comments', [BlogController::class, 'getBlogComments']);
@@ -134,7 +134,6 @@ Route::middleware([JwtMiddleware::class])->group(function () {
     });
     
 });
-
 
 Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     Route::prefix('users')->group(function () {
@@ -211,9 +210,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     Route::prefix('admin')->group(function () {
         Route::get('/statistics', [AdminStatisticController::class, 'index']);
         Route::get('/dashboard-stats', [AdminStatisticController::class, 'getDashboardStats']);
-    });
-    
-    
+    }); 
 });
 
 Route::prefix('blogs')->group(function () {

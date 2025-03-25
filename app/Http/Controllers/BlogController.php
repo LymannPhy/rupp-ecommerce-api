@@ -273,12 +273,12 @@ class BlogController extends Controller
     }
 
     /**
-     * Publish a blog by UUID.
+     * Toggle blog publish status by UUID.
      *
      * @param string $uuid
      * @return \Illuminate\Http\JsonResponse
      */
-    public function publishBlog($uuid)
+    public function togglePublishBlog($uuid)
     {
         try {
             // 🔹 Find blog by UUID
@@ -288,15 +288,12 @@ class BlogController extends Controller
                 return ApiResponse::error('Blog not found', [], 404);
             }
 
-            // 🔹 Check if already published
-            if ($blog->status === 'published') {
-                return ApiResponse::error('Blog is already published', [], 400);
-            }
+            // 🔄 Toggle status and published_at
+            $isCurrentlyPublished = $blog->status === 'published';
 
-            // 🔹 Update blog status to 'published' and set published_at timestamp
             $blog->update([
-                'status' => 'published',
-                'published_at' => now(),
+                'status' => $isCurrentlyPublished ? 'unpublished' : 'published',
+                'published_at' => $isCurrentlyPublished ? null : now(),
             ]);
 
             return ApiResponse::sendResponse([
@@ -304,10 +301,10 @@ class BlogController extends Controller
                 'title' => $blog->title,
                 'status' => $blog->status,
                 'published_at' => $blog->published_at,
-            ], 'Blog published successfully');
+            ], $isCurrentlyPublished ? 'Blog unpublished successfully' : 'Blog published successfully');
 
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed to publish blog', ['error' => $e->getMessage()], 500);
+            return ApiResponse::error('Failed to toggle blog status', ['error' => $e->getMessage()], 500);
         }
     }
 
@@ -657,6 +654,8 @@ class BlogController extends Controller
         $tagUuids = $request->query('tags');
 
         $query = Blog::where('is_deleted', false)
+            ->where('status', 'published')
+            ->whereNotNull('published_at')
             ->with([
                 'user:id,uuid,name,email,avatar',
                 'tags:id,uuid,name',
@@ -674,7 +673,7 @@ class BlogController extends Controller
             return ApiResponse::error('No blogs found', [], 404);
         }
 
-        $responseData = $blogs->getCollection()->map(function ($blog) use ($userId) {
+        $responseData = $blogs->getCollection()->map(function ($blog) {
             return [
                 'uuid' => $blog->uuid,
                 'title' => $blog->title,
@@ -702,7 +701,7 @@ class BlogController extends Controller
 
         return ApiResponse::sendResponse(
             PaginationHelper::formatPagination($blogs, $responseData),
-            'All active blogs retrieved successfully'
+            'All published blogs retrieved successfully'
         );
     }
 
@@ -820,7 +819,7 @@ class BlogController extends Controller
                 'image' => $request->image,
                 'youtube_videos' => $request->youtube_videos ?? [],
                 'user_id' => Auth::id(),  
-                'status' => 'draft',
+                'status' => 'unpublished',
             ]);
 
             if ($request->has('tags')) {
@@ -845,9 +844,7 @@ class BlogController extends Controller
                 'image' => $blog->image,
                 'youtube_videos' => $blog->youtube_videos,
                 'status' => $blog->status,
-                'published_at' => $blog->published_at,
                 'created_at' => $blog->created_at,
-                'updated_at' => $blog->updated_at,
                 'tags' => $blog->tags->pluck('name')->toArray(),
                 'user' => $user
             ], '🎉 Blog created successfully!', 201);

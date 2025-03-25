@@ -16,7 +16,7 @@ return new class extends Migration {
             $table->string('image')->nullable(); 
             $table->json('youtube_videos')->nullable(); 
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->enum('status', ['draft', 'published', 'archived'])->default('draft'); 
+            $table->enum('status', ['published', 'unpublished'])->default('unpublished');
             $table->timestamp('published_at')->nullable(); 
             $table->unsignedBigInteger('views')->default(0)->comment('Number of times the blog has been viewed'); 
             $table->boolean('is_awarded')->nullable()->default(false);
