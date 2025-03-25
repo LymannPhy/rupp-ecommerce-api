@@ -29,7 +29,7 @@ class ProductController extends Controller
     public function getPreorderProducts(Request $request)
     {
         // Get paginated pre-order products
-        $perPage = $request->query('page_size', 10);
+        $perPage = $request->query('page_size', 5);
         $preorderProducts = Product::where('is_preorder', true)
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
@@ -68,7 +68,7 @@ class ProductController extends Controller
                 ->orderBy('created_at', 'desc');
 
             // Paginate results; default page size is 10 or use per_page from request
-            $products = $query->paginate($request->get('per_page', 10));
+            $products = $query->paginate($request->get('per_page', 5));
 
             // Format each product data
             $formattedProducts = $products->map(function ($product) {
@@ -174,7 +174,7 @@ class ProductController extends Controller
             $query->orderByRaw("((order_items_count * 3) + (views * 0.1) + (COALESCE(feedbacks_avg_rating, 0) * 2) + (feedbacks_count)) DESC");
 
             // Get the top 10 products
-            $topProducts = $query->limit(10)->get();
+            $topProducts = $query->limit(5)->get();
 
             if ($topProducts->isEmpty()) {
                 return ApiResponse::error('No products found', [], 404);
