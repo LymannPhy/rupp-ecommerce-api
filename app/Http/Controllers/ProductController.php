@@ -295,7 +295,7 @@ class ProductController extends Controller
             }
 
             // 🔹 Paginate results
-            $pageSize = $validated['page_size'] ?? 10;
+            $pageSize = 5;
             $discountedProducts = $query->paginate($pageSize);
 
             // 🔹 Format response data
@@ -343,9 +343,9 @@ class ProductController extends Controller
 
             // 🔹 Use Pagination Helper to format response
             return ApiResponse::sendResponse(
-                PaginationHelper::formatPagination($discountedProducts, $responseData),
-                'Discounted products retrieved successfully'
-            );
+                $responseData,
+                'Top 5 discounted products retrieved successfully'
+            );            
 
         } catch (\Exception $e) {
             return ApiResponse::error('An error occurred while fetching discounted products', [
