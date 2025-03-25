@@ -16,6 +16,62 @@ use Exception;
 
 class BlogController extends Controller
 {
+    public function getAllBlogs(Request $request)
+    {
+        $perPage = $request->query('per_page', 10);
+        $userId = auth()->id();
+        $tagUuids = $request->query('tags');
+
+        $query = Blog::with([
+            'user:id,uuid,name,email,avatar',
+            'tags:id,uuid,name',
+            'bookmarks' => fn($q) => $q->where('user_id', $userId)
+        ]);
+
+        if (!empty($tagUuids)) {
+            $tagUuidArray = explode(',', $tagUuids);
+            $query->whereHas('tags', fn($q) => $q->whereIn('uuid', $tagUuidArray));
+        }
+
+        $blogs = $query->paginate($perPage);
+
+        if ($blogs->total() === 0) {
+            return ApiResponse::error('No blogs found', [], 404);
+        }
+
+        $responseData = $blogs->getCollection()->map(function ($blog) use ($userId) {
+            return [
+                'uuid' => $blog->uuid,
+                'title' => $blog->title,
+                'content' => $blog->content,
+                'image' => $blog->image,
+                'youtube_videos' => $blog->youtube_videos,
+                'status' => $blog->status,
+                'published_at' => $blog->published_at,
+                'views' => $blog->views,
+                'is_deleted' => $blog->is_deleted, 
+                'created_at' => $blog->created_at,
+                'updated_at' => $blog->updated_at,
+                'tags' => $blog->tags->map(fn($tag) => [
+                    'uuid' => $tag->uuid,
+                    'name' => $tag->name,
+                ]),
+                'user' => [
+                    'uuid' => $blog->user?->uuid,
+                    'name' => $blog->user?->name,
+                    'email' => $blog->user?->email,
+                    'avatar' => $blog->user?->avatar,
+                ]
+            ];
+        });
+
+        return ApiResponse::sendResponse(
+            PaginationHelper::formatPagination($blogs, $responseData),
+            'All blogs retrieved successfully 📝'
+        );
+    }
+
+
     public function toggleBlogStatusByUuid(string $uuid)
     {
         try {

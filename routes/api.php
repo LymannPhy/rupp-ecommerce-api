@@ -205,6 +205,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::post('/{uuid}/award', [BlogController::class, 'confirmAward']);
         Route::get('/topTen', [BlogController::class, 'getTopTenBlogs']);
         Route::patch('/{uuid}/toggle', [BlogController::class, 'toggleBlogStatusByUuid']);
+        Route::get('/getBlogs', [BlogController::class, 'getAllBlogs']);
     });
 
     Route::prefix('admin')->group(function () {
