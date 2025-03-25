@@ -202,6 +202,8 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::get('/top-engagement', [BlogController::class, 'getTopBlogsByEngagement']);
         // ✅ Route for admin to confirm and give awards with rank
         Route::post('/{uuid}/award', [BlogController::class, 'confirmAward']);
+        Route::get('/topTen', [BlogController::class, 'getTopTenBlogs']);
+        Route::patch('/{uuid}/disable', [BlogController::class, 'disableBlogByUuid']);
         
     });
 

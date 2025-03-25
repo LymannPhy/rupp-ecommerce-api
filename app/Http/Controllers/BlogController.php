@@ -16,6 +16,76 @@ use Exception;
 
 class BlogController extends Controller
 {
+    public function disableBlogByUuid(string $uuid)
+    {
+        try {
+            // 🔍 Find blog by UUID
+            $blog = Blog::where('uuid', $uuid)->first();
+
+            // ❌ If not found, return error response
+            if (!$blog) {
+                return ApiResponse::error('Blog not found ❌', ['uuid' => $uuid], 404);
+            }
+
+            // 🔁 If already disabled, return info
+            if ($blog->is_deleted) {
+                return ApiResponse::sendResponse(null, 'Blog is already disabled ⚠️');
+            }
+
+            // ✅ Mark the blog as deleted (soft-delete)
+            $blog->update(['is_deleted' => true]);
+
+            return ApiResponse::sendResponse(null, 'Blog disabled successfully ✅');
+
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to disable blog ❌', [
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getTopTenBlogs()
+    {
+        try {
+            // 🔹 Fetch top 10 blogs based on (views + likes_count)
+            $topBlogs = Blog::withCount('likes')
+                ->where('is_deleted', false)
+                ->where('status', 'published')
+                ->orderByRaw('(views + likes_count) DESC')
+                ->take(10)
+                ->with([
+                    'user:uuid,name,avatar',
+                    'tags:id,name',
+                ])
+                ->get();
+
+            // 🔹 Format response data
+            $formattedBlogs = $topBlogs->map(function ($blog) {
+                return [
+                    'uuid'         => $blog->uuid,
+                    'title'        => $blog->title,
+                    'views'        => $blog->views,
+                    'likes'        => $blog->likes_count,
+                    'image'        => $blog->image,
+                    'author'       => [
+                        'uuid'   => $blog->user->uuid ?? null,
+                        'name'   => $blog->user->name ?? null,
+                        'avatar' => $blog->user->avatar ?? null,
+                    ],
+                    'tags'         => $blog->tags->pluck('name'),
+                    'published_at' => $blog->published_at,
+                ];
+            });
+
+            return ApiResponse::sendResponse($formattedBlogs, 'Top 10 blogs loaded successfully ✅');
+
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to load top blogs ❌', [
+                'error' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
     public function getTopBlogsByEngagement()
     {
         $userId = auth()->id(); // Get the authenticated user ID
