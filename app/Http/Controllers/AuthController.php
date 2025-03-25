@@ -177,11 +177,6 @@ class AuthController extends Controller
 
             $user = User::where('email', $request->email)->first();
 
-            // Check if the user is already verified
-            if ($user->is_verified) {
-                return ApiResponse::sendResponse([], 'User already verified.', 400);
-            }
-
             // Generate a new verification code and expiration time
             $verificationCode = rand(100000, 999999);
             $verificationExpiration = now()->addMinutes(10); // Expires in 10 minutes
