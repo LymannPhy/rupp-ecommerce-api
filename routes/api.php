@@ -127,6 +127,7 @@ Route::middleware([JwtMiddleware::class])->group(function () {
         Route::post('/{uuid}/comment', [BlogController::class, 'commentOnBlog']);
         Route::get('/{uuid}/comments', [BlogController::class, 'getBlogComments']);
         Route::delete('/comment/{uuid}', [BlogController::class, 'deleteComment']);
+        Route::get('/my', [BlogController::class, 'getMyBlogs']);
     });
 
     Route::prefix('feedbacks')->group(function () {

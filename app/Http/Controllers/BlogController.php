@@ -16,6 +16,39 @@ use Exception;
 
 class BlogController extends Controller
 {
+    public function getMyBlogs(Request $request)
+    {
+        $perPage = $request->query('per_page', 10);
+        $userId = auth()->id();
+
+        $blogs = Blog::where('user_id', $userId)
+            ->where('is_deleted', false)
+            ->latest()
+            ->paginate($perPage);
+
+        if ($blogs->total() === 0) {
+            return ApiResponse::error('No blogs found', [], 404);
+        }
+
+        $responseData = $blogs->getCollection()->map(function ($blog) {
+            return [
+                'uuid' => $blog->uuid,
+                'title' => $blog->title,
+                'content' => $blog->content,
+                'image' => $blog->image,
+                'youtube_videos' => $blog->youtube_videos,
+                'status' => $blog->status,
+            ];
+        });
+
+        return ApiResponse::sendResponse(
+            PaginationHelper::formatPagination($blogs, $responseData),
+            'User blogs retrieved successfully'
+        );
+    }
+
+
+
     public function getAllBlogs(Request $request)
     {
         $perPage = $request->query('per_page', 10);
