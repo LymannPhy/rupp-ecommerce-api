@@ -211,15 +211,26 @@ class OrderController extends Controller
                 ], 400);
             }
 
-            // 🔹 Store Order Items
+            // 🔹 Store Order Items & Deduct Stock
             foreach ($cartItems as $item) {
+                // Create order item
                 OrderItem::create([
                     'order_id' => $order->id,
                     'product_id' => $item->product->id,
                     'quantity' => $item->quantity,
                     'price' => $item->product->price,
+                    'discounted_price' => $item->product->discounted_price ?? null,
                 ]);
+
+                // Decrease product stock
+                $product = $item->product;
+                if ($product->stock < $item->quantity) {
+                    throw new \Exception("Insufficient stock for product: {$product->name}");
+                }
+
+                $product->decrement('stock', $item->quantity);
             }
+
 
             // 🔹 Link Payment to Order
             $payment = Payment::find($validated['payment_id']);
