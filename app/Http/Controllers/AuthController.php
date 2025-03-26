@@ -15,6 +15,8 @@ use App\Mail\VerificationCodeMail;
 use App\Mail\ResetPasswordMail;
 use Illuminate\Support\Str;
 use App\Models\Role;
+use Illuminate\Support\Facades\Log;
+
 
 class AuthController extends Controller
 {
@@ -348,19 +350,15 @@ class AuthController extends Controller
         DB::beginTransaction();
 
         try {
-            // Retrieve validated data
             $validated = $request->validated();
 
-            // Check if email is already registered
             if (User::where('email', $validated['email'])->exists()) {
                 return ApiResponse::error('Registration failed', ['email' => 'Email is already registered'], 409);
             }
 
-            // Generate verification code
             $verificationCode = rand(100000, 999999);
             $verificationExpiration = now()->addMinutes(10);
 
-            // Create user
             $user = User::create([
                 'uuid' => Str::uuid()->toString(),
                 'name' => $validated['name'],
@@ -370,15 +368,19 @@ class AuthController extends Controller
                 'verification_code_expiration' => $verificationExpiration,
             ]);
 
-            // Assign "user" role
-            $userRole = Role::where('name', 'user')->first();
-            if (!$userRole) {
-                $userRole = Role::create(['name' => 'user']);
-            }
+            $userRole = Role::firstOrCreate(['name' => 'user']);
             $user->roles()->sync([$userRole->id]);
 
-            // Send verification email
-            Mail::to($user->email)->send(new VerificationCodeMail($user->name, $verificationCode));
+            // 🔐 Safe email sending
+            try {
+                Mail::to($user->email)->send(new VerificationCodeMail($user->name, $verificationCode));
+            } catch (\Throwable $mailException) {
+                \Log::error('Failed to send verification email', [
+                    'user_id' => $user->id,
+                    'email' => $user->email,
+                    'error' => $mailException->getMessage(),
+                ]);
+            }
 
             DB::commit();
 
@@ -386,10 +388,13 @@ class AuthController extends Controller
                 'user' => new AuthResource($user),
                 'token_type' => 'Bearer',
             ], 'User registered successfully. Please check your email for the verification code.', 201);
+
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('Registration failed', ['error' => $e->getMessage()]);
             return ApiResponse::error('User registration failed', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 }
