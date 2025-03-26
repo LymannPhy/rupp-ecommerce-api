@@ -13,6 +13,7 @@ use App\Models\BlogLike;
 use App\Models\Tag;
 use Illuminate\Support\Str;
 use Exception;
+use Carbon\Carbon;
 
 class BlogController extends Controller
 {
@@ -135,23 +136,51 @@ class BlogController extends Controller
         }
     }
 
-
     public function getTopTenBlogs()
     {
         try {
-            // 🔹 Fetch top 10 blogs based on (views + likes_count)
-            $topBlogs = Blog::withCount('likes')
+            $startOfMonth = Carbon::now()->startOfMonth();
+            $endOfMonth = Carbon::now()->endOfMonth();
+
+            // 🔹 Get awarded blogs first (ordered by award_rank)
+            $awardedBlogs = Blog::withCount('likes')
                 ->where('is_deleted', false)
                 ->where('status', 'published')
-                ->orderByRaw('(views + likes_count) DESC')
-                ->take(10)
+                ->where('is_awarded', true)
+                ->whereBetween('published_at', [$startOfMonth, $endOfMonth])
+                ->orderBy('award_rank', 'asc')
                 ->with([
                     'user:uuid,name,avatar',
+                    'awardedBy:uuid,name,avatar',
                     'tags:id,name',
                 ])
+                ->take(3) // Adjust this number if needed
                 ->get();
 
-            // 🔹 Format response data
+            // 🔹 Get the rest based on views + likes (excluding already awarded)
+            $remainingSlots = 10 - $awardedBlogs->count();
+
+            $popularBlogs = Blog::withCount('likes')
+                ->where('is_deleted', false)
+                ->where('status', 'published')
+                ->whereBetween('published_at', [$startOfMonth, $endOfMonth])
+                ->where(function ($q) use ($awardedBlogs) {
+                    if ($awardedBlogs->isNotEmpty()) {
+                        $q->whereNotIn('id', $awardedBlogs->pluck('id'));
+                    }
+                })
+                ->orderByRaw('(views + likes_count) DESC')
+                ->with([
+                    'user:uuid,name,avatar',
+                    'awardedBy:uuid,name,avatar',
+                    'tags:id,name',
+                ])
+                ->take($remainingSlots)
+                ->get();
+
+            $topBlogs = $awardedBlogs->concat($popularBlogs);
+
+            // 🔹 Format response
             $formattedBlogs = $topBlogs->map(function ($blog) {
                 return [
                     'uuid'         => $blog->uuid,
@@ -159,13 +188,22 @@ class BlogController extends Controller
                     'views'        => $blog->views,
                     'likes'        => $blog->likes_count,
                     'image'        => $blog->image,
+                    'published_at' => $blog->published_at,
+                    'tags'         => $blog->tags->pluck('name'),
                     'author'       => [
                         'uuid'   => $blog->user->uuid ?? null,
                         'name'   => $blog->user->name ?? null,
                         'avatar' => $blog->user->avatar ?? null,
                     ],
-                    'tags'         => $blog->tags->pluck('name'),
-                    'published_at' => $blog->published_at,
+                    'is_awarded'   => $blog->is_awarded,
+                    'awarded_at'   => $blog->awarded_at,
+                    'award_type'   => $blog->award_type,
+                    'award_rank'   => $blog->award_rank,
+                    'awarded_by'   => $blog->awardedBy ? [
+                        'uuid'   => $blog->awardedBy->uuid,
+                        'name'   => $blog->awardedBy->name,
+                        'avatar' => $blog->awardedBy->avatar,
+                    ] : null,
                 ];
             });
 
@@ -177,6 +215,8 @@ class BlogController extends Controller
             ], 500);
         }
     }
+
+
 
     public function getTopBlogsByEngagement()
     {
@@ -816,7 +856,6 @@ class BlogController extends Controller
             'is_bookmarked' => $isBookmarked, 
         ], 'Blog details retrieved successfully');
     }
-
 
 
     /**
