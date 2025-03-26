@@ -58,11 +58,12 @@ class BlogController extends Controller
         $userId = auth()->id();
         $tagUuids = $request->query('tags');
 
-        $query = Blog::with([
-            'user:id,uuid,name,email,avatar',
-            'tags:id,uuid,name',
-            'bookmarks' => fn($q) => $q->where('user_id', $userId)
-        ]);
+        $query = Blog::where('status', 'unpublished') 
+            ->with([
+                'user:id,uuid,name,email,avatar',
+                'tags:id,uuid,name',
+                'bookmarks' => fn($q) => $q->where('user_id', $userId)
+            ]);
 
         if (!empty($tagUuids)) {
             $tagUuidArray = explode(',', $tagUuids);
@@ -103,9 +104,10 @@ class BlogController extends Controller
 
         return ApiResponse::sendResponse(
             PaginationHelper::formatPagination($blogs, $responseData),
-            'All blogs retrieved successfully 📝'
+            'All unpublished blogs retrieved successfully 📝'
         );
     }
+
 
 
     public function toggleBlogStatusByUuid(string $uuid)
