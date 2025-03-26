@@ -68,6 +68,15 @@ Route::prefix('suppliers')->group(function () {
 
 Route::get('provinces', [ProvinceController::class, 'index']);
 
+Route::prefix('categories')->group(function () {
+    Route::get('/', [CategoryController::class, 'index']); 
+    Route::post('/', [CategoryController::class, 'store']); 
+    Route::get('/{uuid}', [CategoryController::class, 'show']);
+    Route::put('/{uuid}', [CategoryController::class, 'update']);
+    Route::delete('/{uuid}', [CategoryController::class, 'destroy']);
+    Route::post('/subcategories', [CategoryController::class, 'createSubcategory']);
+});
+
 
 //Protected Route
 Route::middleware([JwtMiddleware::class])->group(function () {
@@ -142,15 +151,6 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::get('{uuid}', [UserController::class, 'getUserByUuid']);
         Route::delete('{uuid}', [UserController::class, 'destroyByUuid']);
         Route::patch('/block/{uuid}', [UserController::class, 'toggleBlockUserByUuid']);
-    });
-
-    Route::prefix('categories')->group(function () {
-        Route::get('/', [CategoryController::class, 'index']); 
-        Route::post('/', [CategoryController::class, 'store']); 
-        Route::get('/{uuid}', [CategoryController::class, 'show']);
-        Route::put('/{uuid}', [CategoryController::class, 'update']);
-        Route::delete('/{uuid}', [CategoryController::class, 'destroy']);
-        Route::post('/subcategories', [CategoryController::class, 'createSubcategory']);
     });
 
     Route::prefix('discounts')->group(function () {
