@@ -739,8 +739,6 @@ class BlogController extends Controller
         $tagUuids = $request->query('tags');
 
         $query = Blog::where('is_deleted', false)
-            ->where('status', 'published')
-            ->whereNotNull('published_at')
             ->with([
                 'user:id,uuid,name,email,avatar',
                 'tags:id,uuid,name',
@@ -786,9 +784,10 @@ class BlogController extends Controller
 
         return ApiResponse::sendResponse(
             PaginationHelper::formatPagination($blogs, $responseData),
-            'All published blogs retrieved successfully'
+            'All blogs retrieved successfully'
         );
     }
+
 
 
     /**
