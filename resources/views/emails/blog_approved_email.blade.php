@@ -88,14 +88,14 @@
         <div class="email-body">
             <h1>Congratulations! Your Blog Post Has Been Published</h1>
             
-            <p>Hello {{user_name}},</p>
+            <p>Hello {{ $user_name }},</p>
             
             <p>We're excited to inform you that your blog post has been reviewed and approved by our admin team. Your content is now live on our website!</p>
             
             <div class="blog-details">
-                <p><strong>Blog Title:</strong> {{blog_title}}</p>
-                <p><strong>Publication Date:</strong> {{publication_date}}</p>
-                <p><strong>Tags:</strong> {{blog_tags}}</p>
+                <p><strong>Blog Title:</strong> {{ $blog_title }}</p>
+                <p><strong>Publication Date:</strong> {{ $publication_date }}</p>
+                <p><strong>Tags:</strong> {{ $blog_tags }}</p>
             </div>
             
             <p>Your contribution is valuable to our community, and we appreciate the time and effort you've put into creating this content.</p>
@@ -103,7 +103,7 @@
             <p>You can view your published blog post by clicking the button below:</p>
             
             <div style="text-align: center;">
-                <a href="{{blog_url}}" class="button">View Your Published Blog</a>
+                <a href="{{ $blog_url }}" class="button">View Your Published Blog</a>
             </div>
             
             <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>

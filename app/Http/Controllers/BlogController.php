@@ -11,9 +11,11 @@ use App\Helpers\PaginationHelper;
 use App\Models\BlogComment;
 use App\Models\BlogLike;
 use App\Models\Tag;
+use BlogPublishedMail;
 use Illuminate\Support\Str;
 use Exception;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Mail;
 
 class BlogController extends Controller
 {
@@ -154,7 +156,7 @@ class BlogController extends Controller
                     'awardedBy:uuid,name,avatar',
                     'tags:id,name',
                 ])
-                ->take(3) // Adjust this number if needed
+                ->take(3) 
                 ->get();
 
             // 🔹 Get the rest based on views + likes (excluding already awarded)
@@ -353,15 +355,15 @@ class BlogController extends Controller
      */
     public function togglePublishBlog($uuid)
     {
+        DB::beginTransaction();
+
         try {
-            // 🔹 Find blog by UUID
-            $blog = Blog::where('uuid', $uuid)->where('is_deleted', false)->first();
+            $blog = Blog::where('uuid', $uuid)->where('is_deleted', false)->with('user', 'tags')->first();
 
             if (!$blog) {
                 return ApiResponse::error('Blog not found', [], 404);
             }
 
-            // 🔄 Toggle status and published_at
             $isCurrentlyPublished = $blog->status === 'published';
 
             $blog->update([
@@ -369,18 +371,26 @@ class BlogController extends Controller
                 'published_at' => $isCurrentlyPublished ? null : now(),
             ]);
 
+            // 🔔 Send email only when publishing
+            if (!$isCurrentlyPublished && $blog->user && $blog->user->email) {
+                Mail::to($blog->user->email)->send(new BlogPublishedMail($blog, $blog->user));
+            }
+
+            DB::commit();
+
             return ApiResponse::sendResponse([
                 'uuid' => $blog->uuid,
                 'title' => $blog->title,
                 'status' => $blog->status,
                 'published_at' => $blog->published_at,
-            ], $isCurrentlyPublished ? 'Blog unpublished successfully' : 'Blog published successfully');
+            ], $isCurrentlyPublished ? 'Blog unpublished successfully' : 'Blog published and email sent successfully ✅');
 
         } catch (\Exception $e) {
+            DB::rollBack();
+
             return ApiResponse::error('Failed to toggle blog status', ['error' => $e->getMessage()], 500);
         }
     }
-
 
     /**
      * Like/Unlike a Blog Post using UUID.
