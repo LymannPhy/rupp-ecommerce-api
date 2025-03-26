@@ -652,42 +652,53 @@ class ProductController extends Controller
             $query = Product::where('is_deleted', false)
                 ->with(['category:id,uuid,name', 'discount:id,uuid,discount_percentage']);
 
-            // Apply search by product name
+            // 🔍 Search by product name
             if ($request->has('search')) {
                 $query->where('name', 'LIKE', '%' . $request->search . '%');
             }
 
-            // Apply category filter
+            // 🔹 Filter by category and its subcategories
             if ($request->has('category_uuid')) {
-                $query->whereHas('category', function ($q) use ($request) {
-                    $q->where('uuid', $request->category_uuid);
-                });
+                $category = Category::where('uuid', $request->category_uuid)->first();
+                if ($category) {
+                    $categoryIds = Category::where('parent_id', $category->id)->pluck('id')->toArray();
+                    $categoryIds[] = $category->id;
+                    $query->whereIn('category_id', $categoryIds);
+                }
             }
 
-            // Apply sorting by price
+            // 🔹 Filter by price range
+            if ($request->has('min_price')) {
+                $query->where('price', '>=', $request->min_price);
+            }
+            if ($request->has('max_price')) {
+                $query->where('price', '<=', $request->max_price);
+            }
+
+            // 🔃 Sort by price
             if ($request->has('sort_price')) {
                 $sortOrder = $request->sort_price === 'desc' ? 'desc' : 'asc';
                 $query->orderBy('price', $sortOrder);
             }
 
-            // Paginate results
-            $products = $query->paginate(10);
+            // 📦 Fetch all filtered products
+            $products = $query->get();
 
-            // Format product data with average rating and discount price calculation
+            // 🧠 Format product response
             $formattedProducts = $products->map(function ($product) {
                 $averageRating = ProductFeedback::where('product_id', $product->id)->avg('rating') ?? 0;
 
-                // Calculate discounted price if a discount exists
                 $discountedPrice = null;
                 if ($product->discount && isset($product->discount->discount_percentage)) {
                     $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
                     $discountedPrice = round($product->price - $discountAmount, 2);
                 }
 
-                // Process images
-                $allImages = is_array($product->multi_images) ? $product->multi_images : json_decode($product->multi_images, true) ?? [];
+                $allImages = is_array($product->multi_images)
+                    ? $product->multi_images
+                    : json_decode($product->multi_images, true) ?? [];
+
                 $singleImage = count($allImages) > 0 ? $allImages[0] : null;
-                $multiImages = count($allImages) > 1 ? array_slice($allImages, 1) : [];
 
                 return [
                     'uuid' => $product->uuid,
@@ -700,19 +711,13 @@ class ProductController extends Controller
                     'stock' => $product->stock,
                     'is_preorder' => $product->is_preorder,
                     'single_image' => $singleImage,
-                    'multi_images' => $multiImages,
-                    'color' => $product->color,
-                    'size' => $product->size,
                     'average_rating' => round($averageRating, 2),
                     'created_at' => $product->created_at,
-                    'updated_at' => $product->updated_at,
                 ];
             });
 
-
-            // Use helper function for pagination response
             return ApiResponse::sendResponse(
-                PaginationHelper::formatPagination($products, $formattedProducts),
+                $formattedProducts,
                 'Products retrieved successfully'
             );
         } catch (\Exception $e) {
