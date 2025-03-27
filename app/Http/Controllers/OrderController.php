@@ -20,6 +20,47 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class OrderController extends Controller
 {
+    public function getWeeklyOrders()
+    {
+        $orders = Order::select(
+                DB::raw("YEAR(created_at) as year"),
+                DB::raw("WEEK(created_at, 1) as week"),
+                'order_code',
+                'total_price',
+                'status',
+                'delivery_date',
+                'created_at'
+            )
+            ->orderBy('created_at', 'desc')
+            ->get()
+            ->groupBy(function ($order) {
+                return $order->year . '-W' . str_pad($order->week, 2, '0', STR_PAD_LEFT);
+            })
+            ->map(function ($orders, $weekKey) {
+                $year = explode('-W', $weekKey)[0];
+                $week = explode('-W', $weekKey)[1];
+
+                $startOfWeek = Carbon::now()->setISODate($year, $week)->startOfWeek();
+                $endOfWeek = $startOfWeek->copy()->endOfWeek();
+
+                return [
+                    'week_label' => $startOfWeek->format('M d') . ' - ' . $endOfWeek->format('M d, Y'),
+                    'orders' => $orders->map(function ($order) {
+                        return [
+                            'order_code' => $order->order_code,
+                            'total_price' => $order->total_price,
+                            'status' => $order->status,
+                            'delivery_date' => $order->delivery_date,
+                            'created_at' => $order->created_at,
+                        ];
+                    })->values()
+                ];
+            })->values();
+
+        return ApiResponse::sendResponse($orders);
+    }
+
+
     /**
      * Get a specific order of the authenticated user by UUID.
      *
@@ -28,6 +69,7 @@ class OrderController extends Controller
      */
     public function getUserOrderByUuid($uuid)
     {
+        
         try {
             $user = auth()->user();
 

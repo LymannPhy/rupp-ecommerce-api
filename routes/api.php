@@ -213,6 +213,10 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::get('/statistics', [AdminStatisticController::class, 'index']);
         Route::get('/dashboard-stats', [AdminStatisticController::class, 'getDashboardStats']);
     }); 
+
+    Route::prefix('orders')->group(function () {
+        Route::get('/weekly', [OrderController::class, 'getWeeklyOrders']);
+    });
 });
 
 Route::prefix('blogs')->group(function () {
