@@ -167,6 +167,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         Route::get('/{uuid}', [CouponController::class, 'show']);
         Route::delete('/{uuid}', [CouponController::class, 'destroy']);
         Route::put('/{uuid}', [CouponController::class, 'update']);
+        Route::patch('/{uuid}/toggle-status', [CouponController::class, 'toggleCouponStatus']);
     });
 
     Route::prefix('products')->group(function () {

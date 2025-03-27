@@ -12,6 +12,37 @@ use Carbon\Carbon;
 class CouponController extends Controller
 {
     /**
+     * Toggle the active status of a coupon by UUID.
+     *
+     * @param string $uuid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toggleCouponStatus(string $uuid)
+    {
+        try {
+            $coupon = Coupon::where('uuid', $uuid)->first();
+
+            if (!$coupon) {
+                return ApiResponse::error('Coupon not found ❌', [], 404);
+            }
+
+            // Flip the is_active status
+            $coupon->is_active = !$coupon->is_active;
+            $coupon->save();
+
+            return ApiResponse::sendResponse([
+                'uuid' => $coupon->uuid,
+                'is_active' => $coupon->is_active,
+                'updated_at' => $coupon->updated_at,
+            ], 'Coupon status toggled successfully ✅');
+
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to toggle coupon status ❌', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+
+    /**
      * Update a coupon by UUID.
      *
      * @param Request $request
@@ -20,7 +51,7 @@ class CouponController extends Controller
      */
     public function update(Request $request, string $uuid)
     {
-        // Validation rules
+        // Validation rules (is_active removed)
         $validator = Validator::make($request->all(), [
             'code' => 'sometimes|string|max:255|unique:coupons,code,' . $uuid . ',uuid',
             'discount_percentage' => 'nullable|numeric|min:0|max:100',
@@ -28,10 +59,8 @@ class CouponController extends Controller
             'user_limit' => 'nullable|integer|min:1',
             'start_date' => 'nullable|date|after_or_equal:today',
             'end_date' => 'nullable|date|after:start_date',
-            'is_active' => 'boolean',
         ]);
 
-        // If validation fails, return a 422 response
         if ($validator->fails()) {
             return ApiResponse::error('Validation Error ❌', $validator->errors()->toArray(), 422);
         }
@@ -43,11 +72,15 @@ class CouponController extends Controller
                 return ApiResponse::error('Coupon not found ❌', [], 404);
             }
 
-            // Format dates if provided
-            $startDate = $request->start_date ? Carbon::parse($request->start_date)->format('Y-m-d H:i:s') : $coupon->start_date;
-            $endDate = $request->end_date ? Carbon::parse($request->end_date)->format('Y-m-d H:i:s') : $coupon->end_date;
+            $startDate = $request->start_date
+                ? Carbon::parse($request->start_date)->format('Y-m-d H:i:s')
+                : $coupon->start_date;
 
-            // Update fields
+            $endDate = $request->end_date
+                ? Carbon::parse($request->end_date)->format('Y-m-d H:i:s')
+                : $coupon->end_date;
+
+            // Only update the allowed fields (exclude is_active)
             $coupon->update([
                 'code' => $request->has('code') ? strtoupper($request->code) : $coupon->code,
                 'discount_percentage' => $request->discount_percentage ?? $coupon->discount_percentage,
@@ -55,7 +88,6 @@ class CouponController extends Controller
                 'user_limit' => $request->user_limit ?? $coupon->user_limit,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
-                'is_active' => $request->has('is_active') ? $request->is_active : $coupon->is_active,
             ]);
 
             return ApiResponse::sendResponse([
@@ -69,10 +101,12 @@ class CouponController extends Controller
                 'is_active' => $coupon->is_active,
                 'updated_at' => $coupon->updated_at,
             ], 'Coupon updated successfully ✅');
+
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to update coupon ❌', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 
     /**
@@ -174,7 +208,6 @@ class CouponController extends Controller
             'user_limit' => 'nullable|integer|min:1',
             'start_date' => 'nullable|date|after_or_equal:today',
             'end_date' => 'nullable|date|after:start_date',
-            'is_active' => 'boolean',
         ]);
 
         // If validation fails, return a 422 response
@@ -183,20 +216,20 @@ class CouponController extends Controller
         }
 
         try {
-
+            // Parse dates if provided
             $startDate = $request->start_date ? Carbon::parse($request->start_date)->format('Y-m-d H:i:s') : null;
             $endDate = $request->end_date ? Carbon::parse($request->end_date)->format('Y-m-d H:i:s') : null;
 
-            // Create a new coupon with UUID
+            // Create a new coupon with is_active set to false
             $coupon = Coupon::create([
                 'uuid' => Str::uuid(),
-                'code' => strtoupper($request->code), 
+                'code' => strtoupper($request->code),
                 'discount_percentage' => $request->discount_percentage,
                 'max_usage' => $request->max_usage,
                 'user_limit' => $request->user_limit,
                 'start_date' => $startDate,
                 'end_date' => $endDate,
-                'is_active' => $request->is_active ?? true,
+                'is_active' => false, 
             ]);
 
             // Return the created coupon response
@@ -212,9 +245,13 @@ class CouponController extends Controller
                 'created_at' => $coupon->created_at,
                 'updated_at' => $coupon->updated_at,
             ], 'Coupon created successfully 🎉', 201);
+
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed to create coupon', ['error' => $e->getMessage()], 500);
+            return ApiResponse::error('Failed to create coupon', [
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
+
 }
 
