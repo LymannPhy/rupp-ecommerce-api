@@ -110,35 +110,39 @@ class BlogController extends Controller
 
 
 
-    public function toggleBlogStatusByUuid(string $uuid)
+    public function publishBlogByUuid(string $uuid)
     {
         try {
-            // 🔍 Find blog by UUID
-            $blog = Blog::where('uuid', $uuid)->first();
+            // 🔍 Find the blog by UUID
+            $blog = Blog::where('uuid', $uuid)->where('is_deleted', false)->first();
 
-            // ❌ If not found, return error response
             if (!$blog) {
                 return ApiResponse::error('Blog not found ❌', ['uuid' => $uuid], 404);
             }
 
-            // 🔁 Toggle the is_deleted status
-            $blog->update(['is_deleted' => !$blog->is_deleted]);
+            if ($blog->status === 'published') {
+                return ApiResponse::error('Blog is already published ✅', [], 400);
+            }
 
-            // ✅ Respond with the new status
-            $status = $blog->is_deleted ? 'disabled' : 'enabled';
-            $message = "Blog {$status} successfully ✅";
+            // ✅ Publish the blog
+            $blog->update([
+                'status' => 'published',
+                'published_at' => now(),
+            ]);
 
             return ApiResponse::sendResponse([
                 'uuid' => $blog->uuid,
-                'is_deleted' => $blog->is_deleted,
-            ], $message);
+                'status' => $blog->status,
+                'published_at' => $blog->published_at,
+            ], 'Blog published successfully ✅');
 
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed to toggle blog status ❌', [
+            return ApiResponse::error('Failed to publish blog ❌', [
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
+
 
     public function getTopTenBlogs()
     {
