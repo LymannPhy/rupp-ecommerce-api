@@ -78,73 +78,6 @@ Route::prefix('categories')->group(function () {
 });
 
 
-//Protected Route
-Route::middleware([JwtMiddleware::class])->group(function () {
-    //User Authentication
-    Route::post('logout', [AuthController::class, 'logout']);
-    Route::post('refresh', [AuthController::class, 'refresh']);
-
-    // User CRUD Routes (Only authenticated users with role "user and admin")
-    Route::prefix('users')->group(function () {
-        Route::get('/current-user', [UserController::class, 'getCurrentUser']);
-        Route::post('/change-password', [UserController::class, 'changePassword']);
-        Route::patch('/update-profile', [UserController::class, 'updateProfile']);
-    });
-
-    Route::prefix('orders')->group(function () {
-        Route::post('/get-total-amount', [OrderController::class, 'getOrderSummary']);
-        Route::get('/', [OrderController::class, 'getUserOrders']);
-        Route::get('/{uuid}', [OrderController::class, 'getUserOrderByUuid']);
-        Route::post('/submit', [OrderController::class, 'submitOrder']);
-        Route::get('/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
-        Route::get('/payment-invoice/{orderUuid}', [OrderController::class, 'getUserPaymentInvoiceData']);
-    });
-
-    Route::prefix('payments')->group(function () {
-        Route::post('/check-payment', [PaymentController::class, 'checkMd5Hash']);
-    });
-
-    Route::prefix('carts')->group(function () {
-        Route::get('/items', [CartController::class, 'getCartItems']);
-        Route::post('/add', [CartController::class, 'addToCart']);
-        Route::delete('/remove', [CartController::class, 'removeFromCart']); 
-        Route::patch('/update-quantity', [CartController::class, 'updateCartQuantity']);
-    });
-
-    Route::prefix('wishlists')->group(function () {
-        Route::post('/add', [WishlistController::class, 'addToWishlist']); 
-        Route::get('/', [WishlistController::class, 'getWishlist']); 
-        Route::delete('/remove', [WishlistController::class, 'removeFromWishlist']);
-        Route::post('/move-to-cart', [WishlistController::class, 'moveWishlistToCart']);
-    });
-
-    Route::prefix('bookmarks')->group(function () {
-        Route::post('/', [BookmarkController::class, 'toggleBookmark']); 
-        Route::get('/', [BookmarkController::class, 'index']); 
-    });
-
-    Route::prefix('product-feedbacks')->group(function () {
-        Route::post('/submit', [ProductFeedbackController::class, 'store']);
-    });
-
-    Route::prefix('blogs')->group(function () { 
-        Route::post('/', [BlogController::class, 'store']); 
-        Route::put('/{uuid}', [BlogController::class, 'update']);
-        Route::delete('/{uuid}', [BlogController::class, 'destroy']);
-        Route::patch('/{uuid}/toggle', [BlogController::class, 'togglePublishBlog']);
-        Route::post('/{uuid}/like', [BlogController::class, 'likeBlog']); 
-        Route::post('/{uuid}/comment', [BlogController::class, 'commentOnBlog']);
-        Route::get('/{uuid}/comments', [BlogController::class, 'getBlogComments']);
-        Route::delete('/comment/{uuid}', [BlogController::class, 'deleteComment']);
-        Route::get('/my', [BlogController::class, 'getMyBlogs']);
-    });
-
-    Route::prefix('feedbacks')->group(function () {
-        Route::post('/', [FeedbackController::class, 'storeFeedback']);
-    });
-    
-});
-
 Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     Route::prefix('users')->group(function () {
         Route::get('/', [UserController::class, 'getAllUsers']);
@@ -217,6 +150,73 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     Route::prefix('orders')->group(function () {
         Route::get('/weekly', [OrderController::class, 'getWeeklyOrders']);
     });
+});
+
+//Protected Route
+Route::middleware([JwtMiddleware::class])->group(function () {
+    //User Authentication
+    Route::post('logout', [AuthController::class, 'logout']);
+    Route::post('refresh', [AuthController::class, 'refresh']);
+
+    // User CRUD Routes (Only authenticated users with role "user and admin")
+    Route::prefix('users')->group(function () {
+        Route::get('/current-user', [UserController::class, 'getCurrentUser']);
+        Route::post('/change-password', [UserController::class, 'changePassword']);
+        Route::patch('/update-profile', [UserController::class, 'updateProfile']);
+    });
+
+    Route::prefix('orders')->group(function () {
+        Route::post('/get-total-amount', [OrderController::class, 'getOrderSummary']);
+        Route::get('/', [OrderController::class, 'getUserOrders']);
+        Route::get('/{uuid}', [OrderController::class, 'getUserOrderByUuid']);
+        Route::post('/submit', [OrderController::class, 'submitOrder']);
+        Route::get('/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
+        Route::get('/payment-invoice/{orderUuid}', [OrderController::class, 'getUserPaymentInvoiceData']);
+    });
+
+    Route::prefix('payments')->group(function () {
+        Route::post('/check-payment', [PaymentController::class, 'checkMd5Hash']);
+    });
+
+    Route::prefix('carts')->group(function () {
+        Route::get('/items', [CartController::class, 'getCartItems']);
+        Route::post('/add', [CartController::class, 'addToCart']);
+        Route::delete('/remove', [CartController::class, 'removeFromCart']); 
+        Route::patch('/update-quantity', [CartController::class, 'updateCartQuantity']);
+    });
+
+    Route::prefix('wishlists')->group(function () {
+        Route::post('/add', [WishlistController::class, 'addToWishlist']); 
+        Route::get('/', [WishlistController::class, 'getWishlist']); 
+        Route::delete('/remove', [WishlistController::class, 'removeFromWishlist']);
+        Route::post('/move-to-cart', [WishlistController::class, 'moveWishlistToCart']);
+    });
+
+    Route::prefix('bookmarks')->group(function () {
+        Route::post('/', [BookmarkController::class, 'toggleBookmark']); 
+        Route::get('/', [BookmarkController::class, 'index']); 
+    });
+
+    Route::prefix('product-feedbacks')->group(function () {
+        Route::post('/submit', [ProductFeedbackController::class, 'store']);
+    });
+
+    Route::prefix('blogs')->group(function () { 
+        Route::post('/', [BlogController::class, 'store']); 
+        Route::put('/{uuid}', [BlogController::class, 'update']);
+        Route::delete('/{uuid}', [BlogController::class, 'destroy']);
+        Route::patch('/{uuid}/toggle', [BlogController::class, 'togglePublishBlog']);
+        Route::post('/{uuid}/like', [BlogController::class, 'likeBlog']); 
+        Route::post('/{uuid}/comment', [BlogController::class, 'commentOnBlog']);
+        Route::get('/{uuid}/comments', [BlogController::class, 'getBlogComments']);
+        Route::delete('/comment/{uuid}', [BlogController::class, 'deleteComment']);
+        Route::get('/my', [BlogController::class, 'getMyBlogs']);
+    });
+
+    Route::prefix('feedbacks')->group(function () {
+        Route::post('/', [FeedbackController::class, 'storeFeedback']);
+    });
+    
 });
 
 Route::prefix('blogs')->group(function () {
