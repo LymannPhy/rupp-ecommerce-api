@@ -18,6 +18,7 @@ use App\Http\Controllers\OrderController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductFeedbackController;
+use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\ProvinceController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\WishlistController;
@@ -39,6 +40,11 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 Route::prefix('orders')->group(function () {
     Route::get('/date-range', [OrderController::class, 'getOrdersByDateRange']);
 });
+Route::prefix('promotion')->group(function () {
+    Route::get('/discounts', [PromotionController::class, 'getAllDiscounts']);
+    Route::get('/coupons', [PromotionController::class, 'getAllCoupons']);
+});
+
 
 
 // Media Uploader(Not require user authentication)

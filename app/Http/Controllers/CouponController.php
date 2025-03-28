@@ -186,7 +186,7 @@ class CouponController extends Controller
                     'start_date' => $coupon->start_date,
                     'end_date' => $coupon->end_date,
                     'is_active' => $coupon->is_active,
-                    'image' => $coupon->image, // ✅ Added image field
+                    'image' => $coupon->image, 
                 ];
             })->toArray();
 
