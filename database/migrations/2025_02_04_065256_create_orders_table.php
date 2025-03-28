@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('order_code', 50)->unique();
             $table->uuid('uuid')->unique()->default(Str::uuid());
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->enum('delivery_method', ['Standard', 'Express'])->default('Standard');
+            $table->string('delivery_method', 255);
             $table->decimal('delivery_price', 10, 2)->default(0.00);
             $table->date('delivery_date')->nullable(); 
             $table->decimal('total_price', 10, 2);

@@ -21,35 +21,34 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class OrderController extends Controller
 {
-    public function getWeeklyOrders(Request $request)
+    public function getOrdersByDateRange(Request $request)
     {
-        $perPage = $request->query('per_page', 10);      // Default 10
-        $yearParam = $request->query('year');            // Optional
-        $weekParam = $request->query('week');            // Optional
-        $sortParam = $request->query('sort', 'desc');   // asc|desc optional
-
+        $perPage = $request->query('per_page', 10); 
+        $startDate = $request->query('start_date'); 
+        $endDate = $request->query('end_date');   
+        $sortParam = $request->query('sort', 'desc'); 
+    
         $ordersQuery = Order::query();
-
-        // Optional Filter by Year
-        if ($yearParam) {
-            $ordersQuery->whereYear('created_at', $yearParam);
+    
+        // Optional Filter by Start & End Date
+        if ($startDate && $endDate) {
+            $ordersQuery->whereBetween('created_at', [$startDate, $endDate]);
+        } elseif ($startDate) {
+            $ordersQuery->whereDate('created_at', '>=', $startDate);
+        } elseif ($endDate) {
+            $ordersQuery->whereDate('created_at', '<=', $endDate);
         }
-
-        // Optional Filter by Week
-        if ($weekParam) {
-            $ordersQuery->where(DB::raw('WEEK(created_at, 1)'), $weekParam);
-        }
-
+    
         // Optional Sort by total_price
         if (in_array(strtolower($sortParam), ['asc', 'desc'])) {
             $ordersQuery->orderBy('total_price', $sortParam);
         } else {
             $ordersQuery->orderBy('created_at', 'desc'); // default sort
         }
-
+    
         // Paginate the orders
         $paginatedOrders = $ordersQuery->paginate($perPage);
-
+    
         // Format data
         $orders = $paginatedOrders->getCollection()->map(function ($order) {
             return [
@@ -60,12 +59,13 @@ class OrderController extends Controller
                 'created_at' => $order->created_at,
             ];
         });
-
+    
         return ApiResponse::sendResponse(
             PaginationHelper::formatPagination($paginatedOrders, $orders),
             'Orders retrieved successfully'
         );
     }
+    
 
 
 

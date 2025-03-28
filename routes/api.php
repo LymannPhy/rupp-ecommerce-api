@@ -37,7 +37,7 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 
 Route::prefix('orders')->group(function () {
-    Route::get('/weekly', [OrderController::class, 'getWeeklyOrders']);
+    Route::get('/date-range', [OrderController::class, 'getOrdersByDateRange']);
 });
 
 
