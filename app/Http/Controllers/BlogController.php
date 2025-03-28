@@ -24,7 +24,8 @@ class BlogController extends Controller
         $perPage = $request->query('per_page', 10);
         $userId = auth()->id();
 
-        $blogs = Blog::where('user_id', $userId)
+        $blogs = Blog::withCount('likes') // <-- counts likes automatically
+            ->where('user_id', $userId)
             ->where('is_deleted', false)
             ->latest()
             ->paginate($perPage);
@@ -41,6 +42,12 @@ class BlogController extends Controller
                 'image' => $blog->image,
                 'youtube_videos' => $blog->youtube_videos,
                 'status' => $blog->status,
+                'views' => $blog->views,
+                'likes_count' => $blog->likes_count,
+                'created_at' => $blog->created_at->toDateTimeString(),
+                'is_awarded' => $blog->is_awarded,
+                'award_type' => $blog->award_type,
+                'award_rank' => $blog->award_rank,
             ];
         });
 
@@ -49,7 +56,6 @@ class BlogController extends Controller
             'User blogs retrieved successfully'
         );
     }
-
 
 
     public function getAllBlogs(Request $request)
@@ -710,7 +716,7 @@ class BlogController extends Controller
 
 
     /**
-     * Soft delete a blog by UUID.
+     * Hard delete a blog by UUID.
      *
      * @param string $uuid
      * @return \Illuminate\Http\JsonResponse
@@ -725,8 +731,8 @@ class BlogController extends Controller
         }
 
         try {
-            // Soft delete the blog
-            $blog->update(['is_deleted' => true]);
+            // Hard delete the blog
+            $blog->delete();
 
             return ApiResponse::sendResponse([], 'Blog deleted successfully');
             
@@ -734,6 +740,7 @@ class BlogController extends Controller
             return ApiResponse::error('Failed to delete blog', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 
     public function index(Request $request)

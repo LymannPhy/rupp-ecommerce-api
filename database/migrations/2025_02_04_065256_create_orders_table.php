@@ -17,11 +17,11 @@ return new class extends Migration
             $table->string('order_code', 50)->unique();
             $table->uuid('uuid')->unique()->default(Str::uuid());
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->decimal('total_price', 10, 2);
-            $table->string('status')->default('pending');
             $table->enum('delivery_method', ['Standard', 'Express'])->default('Standard');
             $table->decimal('delivery_price', 10, 2)->default(0.00);
             $table->date('delivery_date')->nullable(); 
+            $table->decimal('total_price', 10, 2);
+            $table->string('status')->default('pending');
             $table->timestamps();
         }); 
     }

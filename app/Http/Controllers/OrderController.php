@@ -197,7 +197,6 @@ class OrderController extends Controller
 
             $validated = $request->validate([
                 'payment_id' => 'required|exists:payments,id', 
-                'total_cart_value' => 'required|numeric|min:0',
                 'final_total' => 'required|numeric|min:0', 
                 'province_uuid' => 'required|exists:provinces,uuid',
                 'delivery_fee' => 'required|numeric|min:0', 
@@ -225,7 +224,7 @@ class OrderController extends Controller
             $order = Order::create([
                 'order_code' => $orderCode,
                 'user_id' => auth()->id(),
-                'total_price' => $validated['total_cart_value'],
+                'total_price' => $validated['final_total'],
                 'delivery_fee' => $validated['delivery_fee'], 
                 'delivery_method' => 'Delivery by Motor', 
                 'delivery_date' => $deliveryDate, 

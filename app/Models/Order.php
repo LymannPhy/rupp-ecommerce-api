@@ -16,10 +16,10 @@ class Order extends Model
         'uuid',
         'user_id',
         'coupon_id',         
-        'total_price',
         'delivery_price',      
         'delivery_method',   
         'delivery_date',
+        'total_price',
         'status'
     ];
     
