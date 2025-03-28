@@ -24,7 +24,7 @@ class BlogController extends Controller
         $perPage = $request->query('per_page', 10);
         $userId = auth()->id();
 
-        $blogs = Blog::withCount('likes') // <-- counts likes automatically
+        $blogs = Blog::withCount('likes') 
             ->where('user_id', $userId)
             ->where('is_deleted', false)
             ->latest()

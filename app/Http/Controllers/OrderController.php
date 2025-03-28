@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Helpers\PaginationHelper;
 use Illuminate\Http\Request;
 use App\Http\Responses\ApiResponse;
 use App\Models\Cart;
@@ -20,45 +21,53 @@ use Illuminate\Http\Exceptions\HttpResponseException;
 
 class OrderController extends Controller
 {
-    public function getWeeklyOrders()
+    public function getWeeklyOrders(Request $request)
     {
-        $orders = Order::select(
-                DB::raw("YEAR(created_at) as year"),
-                DB::raw("WEEK(created_at, 1) as week"),
-                'order_code',
-                'total_price',
-                'status',
-                'delivery_date',
-                'created_at'
-            )
-            ->orderBy('created_at', 'desc')
-            ->get()
-            ->groupBy(function ($order) {
-                return $order->year . '-W' . str_pad($order->week, 2, '0', STR_PAD_LEFT);
-            })
-            ->map(function ($orders, $weekKey) {
-                $year = explode('-W', $weekKey)[0];
-                $week = explode('-W', $weekKey)[1];
+        $perPage = $request->query('per_page', 10);      // Default 10
+        $yearParam = $request->query('year');            // Optional
+        $weekParam = $request->query('week');            // Optional
+        $sortParam = $request->query('sort', 'desc');   // asc|desc optional
 
-                $startOfWeek = Carbon::now()->setISODate($year, $week)->startOfWeek();
-                $endOfWeek = $startOfWeek->copy()->endOfWeek();
+        $ordersQuery = Order::query();
 
-                return [
-                    'week_label' => $startOfWeek->format('M d') . ' - ' . $endOfWeek->format('M d, Y'),
-                    'orders' => $orders->map(function ($order) {
-                        return [
-                            'order_code' => $order->order_code,
-                            'total_price' => $order->total_price,
-                            'status' => $order->status,
-                            'delivery_date' => $order->delivery_date,
-                            'created_at' => $order->created_at,
-                        ];
-                    })->values()
-                ];
-            })->values();
+        // Optional Filter by Year
+        if ($yearParam) {
+            $ordersQuery->whereYear('created_at', $yearParam);
+        }
 
-        return ApiResponse::sendResponse($orders);
+        // Optional Filter by Week
+        if ($weekParam) {
+            $ordersQuery->where(DB::raw('WEEK(created_at, 1)'), $weekParam);
+        }
+
+        // Optional Sort by total_price
+        if (in_array(strtolower($sortParam), ['asc', 'desc'])) {
+            $ordersQuery->orderBy('total_price', $sortParam);
+        } else {
+            $ordersQuery->orderBy('created_at', 'desc'); // default sort
+        }
+
+        // Paginate the orders
+        $paginatedOrders = $ordersQuery->paginate($perPage);
+
+        // Format data
+        $orders = $paginatedOrders->getCollection()->map(function ($order) {
+            return [
+                'order_code' => $order->order_code,
+                'total_price' => $order->total_price,
+                'status' => $order->status,
+                'delivery_date' => $order->delivery_date,
+                'created_at' => $order->created_at,
+            ];
+        });
+
+        return ApiResponse::sendResponse(
+            PaginationHelper::formatPagination($paginatedOrders, $orders),
+            'Orders retrieved successfully'
+        );
     }
+
+
 
 
     /**
