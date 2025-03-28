@@ -23,12 +23,21 @@ class BlogController extends Controller
     {
         $perPage = $request->query('per_page', 10);
         $userId = auth()->id();
+        $search = $request->query('search');
 
-        $blogs = Blog::withCount('likes') 
+        $query = Blog::withCount('likes') 
             ->where('user_id', $userId)
-            ->where('is_deleted', false)
-            ->latest()
-            ->paginate($perPage);
+            ->where('is_deleted', false);
+
+        // Search by title and content
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%$search%")
+                ->orWhere('content', 'like', "%$search%");
+            });
+        }
+
+        $blogs = $query->latest()->paginate($perPage);
 
         if ($blogs->total() === 0) {
             return ApiResponse::error('No blogs found', [], 404);
@@ -747,7 +756,7 @@ class BlogController extends Controller
     {
         $perPage = $request->query('per_page', 10);
         $userId = auth()->id();
-        $tagUuids = $request->query('tags');
+        $search = $request->query('search');
 
         $query = Blog::where('is_deleted', false)
             ->with([
@@ -756,9 +765,12 @@ class BlogController extends Controller
                 'bookmarks' => fn($q) => $q->where('user_id', $userId)
             ]);
 
-        if (!empty($tagUuids)) {
-            $tagUuidArray = explode(',', $tagUuids);
-            $query->whereHas('tags', fn($q) => $q->whereIn('uuid', $tagUuidArray));
+        // Search only by title and content
+        if (!empty($search)) {
+            $query->where(function($q) use ($search) {
+                $q->where('title', 'like', "%$search%")
+                ->orWhere('content', 'like', "%$search%");
+            });
         }
 
         $blogs = $query->paginate($perPage);

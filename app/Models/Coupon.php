@@ -12,7 +12,8 @@ class Coupon extends Model
 
     protected $fillable = [
         'uuid', 'code', 'discount_percentage', 'max_usage', 
-        'user_limit', 'start_date', 'end_date', 'is_active'
+        'user_limit', 'start_date', 'end_date', 'is_active',
+        'image'
     ];
 
     /**
