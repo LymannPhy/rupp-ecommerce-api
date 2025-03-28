@@ -16,7 +16,7 @@ class ImageUploadController extends Controller
     public function uploadSingle(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'image' => 'required|image|mimes:jpg,jpeg,png|max:2048',
+            'image' => 'required|image|mimes:jpg,jpeg,png,webp,gif|max:2048',
         ]);
 
         if ($validator->fails()) {
@@ -61,7 +61,7 @@ class ImageUploadController extends Controller
         // Validate images
         $validator = Validator::make(['images' => $images], [
             'images' => 'required|array|min:1',
-            'images.*' => 'file|image|mimes:jpg,jpeg,png|max:2048',
+            'images.*' => 'file|image|mimes:jpg,jpeg,png,webp,gif|max:2048',
         ]);
 
         if ($validator->fails()) {
