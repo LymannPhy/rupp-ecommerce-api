@@ -473,40 +473,6 @@ class ProductController extends Controller
                 });
             }
 
-            // ✅ Retrieve the supplier
-            $supplier = $product->supplier;
-            $qrCodeBase64 = null;
-
-            if ($supplier) {
-                // ✅ Generate supplier profile URL
-                $supplierProfileUrl = URL::to('/supplier/' . $supplier->uuid);
-
-                // ✅ Generate QR Code
-                $qrCode = QrCode::create($supplierProfileUrl)
-                    ->setEncoding(new Encoding('UTF-8'))
-                    ->setErrorCorrectionLevel(ErrorCorrectionLevel::Low)
-                    ->setSize(300)
-                    ->setMargin(10);
-
-                // Generate PNG format
-                $writer = new PngWriter();
-                $qrCodeResult = $writer->write($qrCode);
-
-                // Convert to Base64
-                $qrCodeBase64 = 'data:image/png;base64,' . base64_encode($qrCodeResult->getString());
-            }
-
-            // ✅ Format supplier data including the QR code
-            $supplierData = $supplier ? [
-                'uuid' => $supplier->uuid,
-                'name' => $supplier->name,
-                'email' => $supplier->email,
-                'phone' => $supplier->phone,
-                'address' => $supplier->address,
-                'avatar' => $supplier->avatar,
-                'qr_code' => $qrCodeBase64, 
-            ] : null;
-
             // Format product response including similar products and the updated view count
             return ApiResponse::sendResponse([
                 'uuid' => $product->uuid,
@@ -527,8 +493,7 @@ class ProductController extends Controller
                 'created_at' => DateHelper::formatDate($product->created_at),
                 'updated_at' => DateHelper::formatDate($product->updated_at),
                 'feedbacks' => $formattedFeedbacks,
-                'similar_products' => $similarProducts,
-                'supplier' => $supplierData,
+                'similar_products' => $similarProducts
             ], 'Product details retrieved successfully with discount price, top feedbacks, and similar products ✅');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve product details 🤯', ['error' => $e->getMessage()], 500);
