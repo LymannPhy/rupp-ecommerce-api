@@ -741,7 +741,6 @@ class ProductController extends Controller
             'category_uuid' => 'required|exists:categories,uuid',
             'subcategory_uuid' => 'nullable|exists:categories,uuid',
             'discount_uuid' => 'nullable|exists:discounts,uuid',
-            'supplier_uuid' => 'required|exists:suppliers,uuid',
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'is_preorder' => 'boolean',
@@ -755,28 +754,15 @@ class ProductController extends Controller
         }
 
         try {
-            // Retrieve category
             $category = Category::where('uuid', $request->category_uuid)->first();
-
-            // Retrieve subcategory (if provided)
             $subcategory = $request->subcategory_uuid ? Category::where('uuid', $request->subcategory_uuid)->first() : null;
 
-            // Validate that the subcategory belongs to the main category
             if ($subcategory && $subcategory->parent_id !== $category->id) {
                 return ApiResponse::error('Invalid Subcategory ❌', ['subcategory_uuid' => 'This subcategory does not belong to the selected category.'], 400);
             }
 
-            // Retrieve discount if provided
             $discount = $request->discount_uuid ? Discount::where('uuid', $request->discount_uuid)->first() : null;
 
-            // ✅ Retrieve supplier
-            $supplier = Supplier::where('uuid', $request->supplier_uuid)->first();
-
-            if (!$supplier) {
-                return ApiResponse::error('Invalid Supplier ❌', ['supplier_uuid' => 'The specified supplier does not exist.'], 400);
-            }
-
-            // ✅ **Clean and store `multi_images` correctly**
             $multiImages = $request->multi_images ?? [];
             if (!empty($multiImages)) {
                 $multiImages = array_map(function ($image) {
@@ -784,19 +770,17 @@ class ProductController extends Controller
                 }, $multiImages);
             }
 
-            // Create new product
             $product = Product::create([
                 'uuid' => Str::uuid(),
-                'category_id' => $subcategory ? $subcategory->id : $category->id, 
+                'category_id' => $subcategory ? $subcategory->id : $category->id,
                 'discount_id' => $discount ? $discount->id : null,
-                'supplier_id' => $supplier->id,
                 'name' => $request->name,
                 'description' => $request->description,
                 'price' => $request->price,
                 'stock' => $request->stock,
                 'is_preorder' => $request->is_preorder ?? false,
-                'multi_images' => json_encode($multiImages), 
-                'is_recommended' => $request->is_recommended ?? false, 
+                'multi_images' => json_encode($multiImages),
+                'is_recommended' => $request->is_recommended ?? false,
             ]);
 
             return ApiResponse::sendResponse([
@@ -804,14 +788,13 @@ class ProductController extends Controller
                 'category_uuid' => $category->uuid,
                 'subcategory_uuid' => $subcategory ? $subcategory->uuid : null,
                 'discount_uuid' => $discount ? $discount->uuid : null,
-                'supplier_uuid' => $supplier->uuid,
                 'name' => $product->name,
                 'description' => $product->description,
                 'price' => $product->price,
                 'stock' => $product->stock,
                 'is_preorder' => $product->is_preorder,
-                'multi_images' => json_decode($product->multi_images, true), // ✅ Return as array
-                'is_recommended' => $product->is_recommended, 
+                'multi_images' => json_decode($product->multi_images, true),
+                'is_recommended' => $product->is_recommended,
                 'created_at' => $product->created_at,
                 'updated_at' => $product->updated_at,
             ], 'Product created successfully 🎉', 201);
@@ -820,5 +803,6 @@ class ProductController extends Controller
             return ApiResponse::error('Failed to create product', ['error' => $e->getMessage()], 500);
         }
     }
+
 }
 

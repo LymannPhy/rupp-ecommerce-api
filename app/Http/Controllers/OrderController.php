@@ -212,7 +212,7 @@ class OrderController extends Controller
                 'email' => 'required|email',
                 'phone_number' => 'required|string',
                 'current_address' => 'required|string',
-                'google_map_link' => 'nullable|url',
+                'google_map_link' => ['nullable', 'url', 'regex:/^(https:\/\/)?(www\.)?(google\.com\/maps|goo\.gl\/maps)\/.*/i'],
                 'remarks' => 'nullable|string',
             ]);
 
