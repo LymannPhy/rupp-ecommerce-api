@@ -52,6 +52,7 @@ class OrderController extends Controller
         // Format data
         $orders = $paginatedOrders->getCollection()->map(function ($order) {
             return [
+                'uuid' => $order->uuid,
                 'order_code' => $order->order_code,
                 'total_price' => $order->total_price,
                 'status' => $order->status,
@@ -66,9 +67,6 @@ class OrderController extends Controller
         );
     }
     
-
-
-
 
     /**
      * Get a specific order of the authenticated user by UUID.

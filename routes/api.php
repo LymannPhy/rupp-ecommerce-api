@@ -39,6 +39,7 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 Route::prefix('orders')->group(function () {
     Route::get('/date-range', [OrderController::class, 'getOrdersByDateRange']);
+    Route::get('/{uuid}', [OrderController::class, 'getUserOrderByUuid']);
 });
 Route::prefix('promotion')->group(function () {
     Route::get('/discounts', [PromotionController::class, 'getAllDiscounts']);
@@ -72,11 +73,6 @@ Route::prefix('feedbacks')->group(function () {
     Route::get('/promoted', [FeedbackController::class, 'getPromotedFeedbacks']);
 });
 
-Route::prefix('suppliers')->group(function () {
-    Route::get('/{uuid}/qr-code', [SupplierController::class, 'generateSupplierQRCode']);
-    Route::get('/{uuid}', [SupplierController::class, 'showSupplierProfile']);
-});
-
 Route::get('provinces', [ProvinceController::class, 'index']);
 
 Route::prefix('categories')->group(function () {
@@ -105,7 +101,6 @@ Route::middleware([JwtMiddleware::class])->group(function () {
     Route::prefix('orders')->group(function () {
         Route::post('/get-total-amount', [OrderController::class, 'getOrderSummary']);
         Route::get('/', [OrderController::class, 'getUserOrders']);
-        Route::get('/{uuid}', [OrderController::class, 'getUserOrderByUuid']);
         Route::post('/submit', [OrderController::class, 'submitOrder']);
         Route::get('/invoice/{orderUuid}', [OrderController::class, 'generateInvoicePDF']);
         Route::get('/payment-invoice/{orderUuid}', [OrderController::class, 'getUserPaymentInvoiceData']);
@@ -201,13 +196,6 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
     Route::prefix('product-feedbacks')->group(function () {
         Route::get('/all', [ProductFeedbackController::class, 'getAllFeedbacks']);
         Route::delete('/soft-delete/{uuid}', [ProductFeedbackController::class, 'softDelete']);
-    });
-
-    Route::prefix('suppliers')->group(function () {
-        Route::get('/', [SupplierController::class, 'getAllSuppliers']);
-        Route::post('/create', [SupplierController::class, 'store']);
-        Route::put('/update/{uuid}', [SupplierController::class, 'update']);
-        Route::delete('/delete/{uuid}', [SupplierController::class, 'delete']);
     });
     
     
