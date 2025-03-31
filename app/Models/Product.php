@@ -81,11 +81,6 @@ class Product extends Model
         return $this->hasMany(ProductFeedback::class, 'product_id');
     }
 
-    public function supplier()
-    {
-        return $this->belongsTo(Supplier::class);
-    }
-
     // Define the relationship with OrderItem
     public function orderItems()
     {
