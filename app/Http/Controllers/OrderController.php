@@ -15,12 +15,34 @@ use App\Models\Payment;
 use App\Models\Province;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
 
 class OrderController extends Controller
 {
+    public function updateOrderStatus($orderUuid)
+    {
+        try {
+            $order = Order::where('uuid', $orderUuid)
+                ->where('status', 'processing')
+                ->first();
+
+            if (!$order) {
+                return ApiResponse::error('Order not found or not in processing state.', [], 404);
+            }
+
+            $order->update(['status' => 'completed']);
+
+            return ApiResponse::sendResponse($order, 'Order status updated to completed successfully!', 200);
+            
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to update order status.', [
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    
     public function getOrdersByDateRange(Request $request)
     {
         $perPage = $request->query('per_page', 10); 

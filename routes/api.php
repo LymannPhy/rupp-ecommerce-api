@@ -39,6 +39,7 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 Route::prefix('orders')->group(function () {
     Route::get('/date-range', [OrderController::class, 'getOrdersByDateRange']);
+    Route::patch('/{orderUuid}/complete', [OrderController::class, 'updateOrderStatus']);
     Route::get('/{uuid}', [OrderController::class, 'getOrderByUuid']);
 });
 Route::prefix('promotion')->group(function () {
