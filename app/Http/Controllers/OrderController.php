@@ -104,8 +104,8 @@ class OrderController extends Controller
                 'total_price' => $order->total_price, // ✅ Only returning total price
                 'status' => $order->status,
                 'delivery_method' => $order->delivery_method,
-                'delivery_date' => $order->delivery_date,
-                'created_at' => $order->created_at->format('Y-m-d H:i:s'),
+                'delivery_date' => $order->delivery_date ? $order->delivery_date->format('Y-m-d H:i:s') : null,
+                'created_at' => $order->created_at ? $order->created_at->format('Y-m-d H:i:s') : null,
                 'coupon' => $order->coupon ? [
                     'code' => $order->coupon->code,
                     'discount_percentage' => $order->coupon->discount_percentage,
