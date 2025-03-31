@@ -12,14 +12,8 @@ use App\Models\Discount;
 use App\Http\Responses\ApiResponse;
 use App\Helpers\PaginationHelper;
 use App\Models\ProductFeedback;
-use App\Models\Supplier;
 use Carbon\Carbon;
-use Endroid\QrCode\QrCode;
-use Endroid\QrCode\Writer\PngWriter;
-use Endroid\QrCode\Encoding\Encoding;
-use Endroid\QrCode\ErrorCorrectionLevel;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\URL;
 
 class ProductController extends Controller
 {
@@ -31,18 +25,29 @@ class ProductController extends Controller
         // Get paginated pre-order products
         $perPage = $request->query('page_size', 5);
         $preorderProducts = Product::where('is_preorder', true)
+            ->with(['discount'])
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
 
         // Extract required fields
         $formattedProducts = $preorderProducts->map(function ($product) {
+            $discountedPrice = $product->discount ? $product->price - ($product->price * $product->discount->percentage / 100) : $product->price;
+            
+            // Decode multi_images and get the first image as single_image
+            $allImages = json_decode($product->multi_images, true);
+            if (!is_array($allImages)) {
+                $allImages = []; // Ensure it defaults to an empty array
+            }
+            $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
+
             return [
                 'uuid' => $product->uuid,
                 'name' => $product->name,
                 'description' => $product->description,
                 'original_price' => $product->price,
-                'discount_price' => $product->discount ? $product->price - ($product->price * $product->discount->percentage / 100) : $product->price,
+                'discount_price' => $discountedPrice,
                 'is_preorder' => $product->is_preorder,
+                'single_image' => $singleImage,
                 'created_at' => $product->created_at,
             ];
         });
@@ -62,13 +67,11 @@ class ProductController extends Controller
     public function recommended(Request $request)
     {
         try {
-            $query = Product::where('is_deleted', false)
+            $products = Product::where('is_deleted', false)
                 ->where('is_recommended', true)
                 ->with(['category:id,uuid,name', 'discount:id,uuid,discount_percentage'])
-                ->orderBy('created_at', 'desc');
-
-            // Paginate results; default page size is 10 or use per_page from request
-            $products = $query->paginate($request->get('per_page', 5));
+                ->orderBy('created_at', 'desc')
+                ->get();
 
             // Format each product data
             $formattedProducts = $products->map(function ($product) {
@@ -78,16 +81,16 @@ class ProductController extends Controller
                     $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
                     $discountedPrice = round($product->price - $discountAmount, 2);
                 }
-                
+
                 // Calculate average rating (if applicable)
                 $averageRating = ProductFeedback::where('product_id', $product->id)->avg('rating') ?? 0;
 
                 // ✅ Decode multi_images column correctly
-                $allImages = json_decode($product->multi_images, true); // Decode JSON to array
+                $allImages = json_decode($product->multi_images, true); 
                 if (!is_array($allImages)) {
                     $allImages = []; // Ensure it defaults to an empty array
                 }
-                $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; // Get first image
+                $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
 
                 return [
                     'uuid' => $product->uuid,
@@ -100,17 +103,13 @@ class ProductController extends Controller
                     'stock' => $product->stock,
                     'is_recommended' => $product->is_recommended,
                     'average_rating' => round($averageRating, 2),
-                    'single_image' => $singleImage, // ✅ Correct first image
-                    'images' => $allImages, // ✅ Remaining images
+                    'single_image' => $singleImage,
                     'created_at' => $product->created_at,
                     'updated_at' => $product->updated_at,
                 ];
             });
 
-            return ApiResponse::sendResponse(
-                \App\Helpers\PaginationHelper::formatPagination($products, $formattedProducts),
-                'Recommended products retrieved successfully'
-            );
+            return ApiResponse::sendResponse($formattedProducts, 'Recommended products retrieved successfully');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve recommended products', ['error' => $e->getMessage()], 500);
         }
@@ -206,14 +205,13 @@ class ProductController extends Controller
                 if (!is_array($allImages)) {
                     $allImages = []; // Ensure it's an array
                 }
-                $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; // Get first image
+                $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
 
                 return [
                     'uuid'               => $product->uuid,
                     'name'               => $product->name,
                     'description'        => $product->description,
                     'single_image'       => $singleImage,  
-                    'images'             => $allImages,  
                     'price'              => $product->price,
                     'discount_percentage'=> $discountPercentage,
                     'discounted_price'   => $discountedPrice,
@@ -324,14 +322,13 @@ class ProductController extends Controller
                 if (!is_array($allImages)) {
                     $allImages = []; // Ensure it's an array
                 }
-                $singleImage = count($allImages) > 0 ? array_shift($allImages) : null; 
+                $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
 
                 return [
                     'uuid'               => $product->uuid,
                     'name'               => $product->name,
                     'description'        => $product->description,
                     'single_image'       => $singleImage, 
-                    'images'             => $allImages, 
                     'price'              => $product->price,
                     'discounted_price'   => $discountedPrice,
                     'stock'              => $product->stock,
@@ -663,7 +660,7 @@ class ProductController extends Controller
                     ? $product->multi_images
                     : json_decode($product->multi_images, true) ?? [];
 
-                $singleImage = count($allImages) > 0 ? $allImages[0] : null;
+                $singleImage = count($allImages) > 0 ? str_replace('\\', '/', $allImages[0]) : null;
 
                 return [
                     'uuid' => $product->uuid,
