@@ -10,7 +10,6 @@ use App\Models\Product;
 use App\Models\Category;
 use App\Models\Discount;
 use App\Http\Responses\ApiResponse;
-use App\Helpers\PaginationHelper;
 use App\Models\ProductFeedback;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +42,7 @@ class ProductController extends Controller
                 'uuid' => $product->uuid,
                 'name' => $product->name,
                 'description' => $product->description,
-                'original_price' => $product->price,
+                'price' => $product->price,
                 'discount_price' => $discountedPrice,
                 'is_preorder' => $product->is_preorder,
                 'single_image' => $singleImage,
