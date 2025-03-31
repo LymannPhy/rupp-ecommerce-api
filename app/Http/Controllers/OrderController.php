@@ -69,24 +69,16 @@ class OrderController extends Controller
     
 
     /**
-     * Get a specific order of the authenticated user by UUID.
+     * Get a specific order by UUID (with order details).
      *
      * @param string $uuid
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getUserOrderByUuid($uuid)
+    public function getOrderByUuid($uuid)
     {
-        
         try {
-            $user = auth()->user();
-
-            if (!$user) {
-                return ApiResponse::error('Unauthorized ❌', ['error' => 'User not authenticated'], 401);
-            }
-
             // 🔹 Fetch the specific order with related data
-            $order = Order::where('user_id', $user->id)
-                ->where('uuid', $uuid)
+            $order = Order::where('uuid', $uuid)
                 ->with([
                     'orderItems.product' => function ($query) {
                         $query->select('id', 'uuid', 'name', 'price', 'multi_images', 'discount_id', 'is_preorder');
@@ -95,7 +87,8 @@ class OrderController extends Controller
                         $query->select('id', 'discount_percentage', 'is_active', 'start_date', 'end_date');
                     },
                     'coupon:id,code,discount_percentage',
-                    'payment:id,order_id,amount'
+                    'payment:id,order_id,amount',
+                    'details' // ✅ Include order details
                 ])
                 ->first();
 
@@ -107,9 +100,8 @@ class OrderController extends Controller
             $formattedOrder = [
                 'uuid' => $order->uuid,
                 'order_code' => $order->order_code,
-                'delivery_fee' => $order->delivery_fee,
-                'sub_total_price' => $order->total_price,
-                'total_price' => $order->payment ? $order->payment->amount : 0,
+                'delivery_fee' => $order->delivery_price,
+                'total_price' => $order->total_price, // ✅ Only returning total price
                 'status' => $order->status,
                 'delivery_method' => $order->delivery_method,
                 'delivery_date' => $order->delivery_date,
@@ -117,6 +109,13 @@ class OrderController extends Controller
                 'coupon' => $order->coupon ? [
                     'code' => $order->coupon->code,
                     'discount_percentage' => $order->coupon->discount_percentage,
+                ] : null,
+                'order_details' => $order->details ? [ // ✅ Include order details info
+                    'email' => $order->details->email,
+                    'phone_number' => $order->details->phone_number,
+                    'province' => $order->details->province ? $order->details->province->name : null, 
+                    'google_map_link' => $order->details->google_map_link,
+                    'remarks' => $order->details->remarks,
                 ] : null,
                 'items' => $order->orderItems->map(function ($item) {
                     $product = $item->product;
@@ -137,20 +136,20 @@ class OrderController extends Controller
                         'discounted_price' => $discountedPrice,
                         'total_price' => round($item->quantity * $discountedPrice, 2),
                         'is_preorder' => $product->is_preorder,
-                        // Check if multi_images is a string or already an array
                         'image' => $product->multi_images 
-                        ? (is_string($product->multi_images) ? json_decode($product->multi_images, true) : $product->multi_images)[0] ?? null 
-                        : null,
+                            ? (is_string($product->multi_images) ? json_decode($product->multi_images, true) : $product->multi_images)[0] ?? null 
+                            : null,
                     ];
                 }),
             ];
 
-            return ApiResponse::sendResponse($formattedOrder, 'User order retrieved successfully ✅');
+            return ApiResponse::sendResponse($formattedOrder, 'Order retrieved successfully ✅');
             
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve order 🔥', ['error' => $e->getMessage()], 500);
         }
     }
+
 
 
     /**

@@ -39,7 +39,7 @@ Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
 Route::prefix('orders')->group(function () {
     Route::get('/date-range', [OrderController::class, 'getOrdersByDateRange']);
-    Route::get('/{uuid}', [OrderController::class, 'getUserOrderByUuid']);
+    Route::get('/{uuid}', [OrderController::class, 'getOrderByUuid']);
 });
 Route::prefix('promotion')->group(function () {
     Route::get('/discounts', [PromotionController::class, 'getAllDiscounts']);
