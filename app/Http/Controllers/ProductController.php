@@ -22,12 +22,11 @@ class ProductController extends Controller
      */
     public function getPreorderProducts(Request $request)
     {
-        // Get paginated pre-order products
-        $perPage = $request->query('page_size', 5);
+        // Get all pre-order products
         $preorderProducts = Product::where('is_preorder', true)
             ->with(['discount'])
             ->orderBy('created_at', 'desc')
-            ->paginate($perPage);
+            ->get(); // Removed pagination
 
         // Extract required fields
         $formattedProducts = $preorderProducts->map(function ($product) {
@@ -36,7 +35,7 @@ class ProductController extends Controller
             // Decode multi_images and get the first image as single_image
             $allImages = json_decode($product->multi_images, true);
             if (!is_array($allImages)) {
-                $allImages = []; // Ensure it defaults to an empty array
+                $allImages = []; 
             }
             $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
 
@@ -52,11 +51,9 @@ class ProductController extends Controller
             ];
         });
 
-        // Format response using PaginationHelper
-        $response = PaginationHelper::formatPagination($preorderProducts, $formattedProducts);
-
-        return ApiResponse::sendResponse($response, 'Pre-order products retrieved successfully');
+        return ApiResponse::sendResponse($formattedProducts, 'Pre-order products retrieved successfully');
     }
+
 
     /**
      * Retrieve recommended products sorted by creation date with pagination.
