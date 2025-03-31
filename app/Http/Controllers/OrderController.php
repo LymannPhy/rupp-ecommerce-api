@@ -49,9 +49,9 @@ class OrderController extends Controller
         $startDate = $request->query('start_date'); 
         $endDate = $request->query('end_date');   
         $sortParam = $request->query('sort', 'desc'); 
-    
+
         $ordersQuery = Order::query();
-    
+
         // Optional Filter by Start & End Date
         if ($startDate && $endDate) {
             $ordersQuery->whereBetween('created_at', [$startDate, $endDate]);
@@ -60,17 +60,18 @@ class OrderController extends Controller
         } elseif ($endDate) {
             $ordersQuery->whereDate('created_at', '<=', $endDate);
         }
-    
-        // Optional Sort by total_price
+
+        // Always sort by latest orders first
+        $ordersQuery->orderBy('created_at', 'desc');
+
+        // Optional Sort by total_price (after created_at sorting)
         if (in_array(strtolower($sortParam), ['asc', 'desc'])) {
             $ordersQuery->orderBy('total_price', $sortParam);
-        } else {
-            $ordersQuery->orderBy('created_at', 'desc'); // default sort
         }
-    
+
         // Paginate the orders
         $paginatedOrders = $ordersQuery->paginate($perPage);
-    
+
         // Format data
         $orders = $paginatedOrders->getCollection()->map(function ($order) {
             return [
@@ -82,12 +83,13 @@ class OrderController extends Controller
                 'created_at' => $order->created_at,
             ];
         });
-    
+
         return ApiResponse::sendResponse(
             PaginationHelper::formatPagination($paginatedOrders, $orders),
             'Orders retrieved successfully'
         );
     }
+
     
 
     /**
