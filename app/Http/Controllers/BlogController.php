@@ -145,6 +145,10 @@ class BlogController extends Controller
                 'published_at' => now(),
             ]);
 
+            // 📧 Send email to the author
+            $user = $blog->user; 
+            Mail::to($user->email)->send(new BlogPublishedMail($blog, $user));
+
             return ApiResponse::sendResponse([
                 'uuid' => $blog->uuid,
                 'status' => $blog->status,
