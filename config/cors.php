@@ -29,7 +29,9 @@ return [
         "https://167.172.69.43:3000",
         "http://167.172.69.43:3001",
         "https://167.172.69.43:3001",
-        "https://cam-o2.com/"
+        "https://cam-o2.com/",
+        "http://cam-o2.com",
+        "https://cam-o2.com",
     ], 
     
     'allowed_origins_patterns' => [],
