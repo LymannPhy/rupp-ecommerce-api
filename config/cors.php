@@ -35,7 +35,9 @@ return [
         "https://o2-testing.vercel.app/",
         "https://o2-testing.vercel.app",
         "http://o2-testing.vercel.app/",
-        "http://o2-testing.vercel.app/"
+        "http://o2-testing.vercel.app/",
+        "https://cam-o2-api.shop",
+        "http://cam-o2-api.shop"
     ], 
     
     'allowed_origins_patterns' => [],
