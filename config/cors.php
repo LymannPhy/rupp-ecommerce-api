@@ -21,7 +21,7 @@ return [
 
     'allowed_origins' => [
         "http://localhost:3000", 
-        "http://localhost:3000/", 
+        "https://localhost:3000", 
         "http://192.168.100.9:3000", 
         "https://167.172.69.43",  
         "http://167.172.69.43", 
