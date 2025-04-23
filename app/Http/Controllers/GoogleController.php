@@ -2,14 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Responses\ApiResponse;
 use Illuminate\Http\Request;
 use App\Models\User;
 use Laravel\Socialite\Facades\Socialite;
 use Tymon\JWTAuth\Facades\JWTAuth;
-use Tymon\JWTAuth\Exceptions\JWTException;
 use Illuminate\Support\Facades\Hash;
 use Exception;
+use Google_Client;
+use Illuminate\Support\Facades\Http;
 
 class GoogleController extends Controller
 {
@@ -27,68 +27,80 @@ class GoogleController extends Controller
     public function handleGoogleCallback(Request $request)
     {
         try {
-            $googleUser = Socialite::driver('google')->stateless()->user();
+            $code = $request->input('code');
+            if (!$code) {
+                return response()->json(['error' => 'Missing authorization code'], 400);
+            }
 
-            $user = User::where('google_id', $googleUser->id)->first();
+            $tokenUrl = 'https://oauth2.googleapis.com/token';
+            $redirectUri = config('services.google.redirect'); 
+
+            $response = Http::asForm()->post($tokenUrl, [
+                'code' => $code,
+                'client_id' => config('services.google.client_id'),
+                'client_secret' => config('services.google.client_secret'),
+                'redirect_uri' => $redirectUri,
+                'grant_type' => 'authorization_code',
+            ]);
+
+            if ($response->failed()) {
+                return response()->json(['error' => 'Token exchange failed', 'details' => $response->body()], 500);
+            }
+
+            $tokenData = $response->json();
+
+            // ✅ Verify ID Token
+            $client = new Google_Client(['client_id' => config('services.google.client_id')]);
+            $payload = $client->verifyIdToken($tokenData['id_token']);
+
+            if (!$payload) {
+                return response()->json(['error' => 'Invalid ID token'], 400);
+            }
+
+            $googleId = $payload['sub'];
+            $email = $payload['email'];
+            $name = $payload['name'];
+
+            // ✅ Check or create user
+            $user = User::where('google_id', $googleId)->orWhere('email', $email)->first();
 
             if (!$user) {
+                $username = explode('@', $email)[0];
+                $base = $username;
+                $counter = 1;
+                while (User::where('name', $username)->exists()) {
+                    $username = $base . $counter;
+                    $counter++;
+                }
+
                 $user = User::create([
-                    'name'        => $googleUser->name,
-                    'email'       => $googleUser->email,
-                    'google_id'   => $googleUser->id,
+                    'name'        => $username,
+                    'email'       => $email,
+                    'google_id'   => $googleId,
                     'password'    => Hash::make('123456dummy'),
-                    'is_verified' => 1,  
+                    'is_verified' => true,
                 ]);
-
-            } else {
-                $user->update(['is_verified' => 1]);
             }
 
-            if (!$token = JWTAuth::fromUser($user)) {
-                return ApiResponse::error('Could not create token', [], 500);
-            }
+            // ✅ Generate JWT
+            $accessToken = JWTAuth::fromUser($user);
+            $refreshToken = JWTAuth::claims(['refresh' => true])->fromUser($user);
 
-            $ttl = config('jwt.ttl');
-            $expires_in = $ttl * 60;
-
-            $refresh_token = JWTAuth::claims(['refresh' => true])->fromUser($user);
-
-            $userData = [
-                'username'    => $user->name,
-                'email'       => $user->email,
-                'avatar'      => $user->avatar ?? null, 
-                'role'        => $user->roles()->pluck('name')->first() ?? 'user', 
-                'is_verified' => $user->is_verified,     
-                'is_blocked'  => $user->is_blocked,      
-            ];
-
-            $tokenData = [
-                'access_token'  => $token,
-                'refresh_token' => $refresh_token,
+            return response()->json([
+                'access_token'  => $accessToken,
+                'refresh_token' => $refreshToken,
                 'token_type'    => 'Bearer',
-                'expires_in'    => $expires_in,
-                'user'          => $userData,
-            ];
+                'expires_in'    => config('jwt.ttl') * 60,
+                'user'          => [
+                    'id'       => $user->id,
+                    'name'     => $user->name,
+                    'email'    => $user->email,
+                    'google_id'=> $user->google_id,
+                ],
+            ]);
 
-            return ApiResponse::sendResponse(
-                $tokenData,
-                "Welcome back, {$user->name}! 🎉 You're all set to conquer the world. 🌟",
-                200
-            );
-
-        } catch (JWTException $e) {
-            // Handle JWT token creation failures
-            return ApiResponse::error(
-                'Could not create token',
-                ['exception' => $e->getMessage()],
-                500
-            );
         } catch (Exception $e) {
-            return ApiResponse::error(
-                'Google login failed',
-                ['error' => $e->getMessage()],
-                500
-            );
+            return response()->json(['error' => 'Google login failed', 'details' => $e->getMessage()], 500);
         }
     }
 }
