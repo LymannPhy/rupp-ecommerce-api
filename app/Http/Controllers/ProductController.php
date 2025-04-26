@@ -80,7 +80,7 @@ class ProductController extends Controller
         try {
             // Get recommended products
             $products = Product::where('is_deleted', false)
-                ->where('is_recommended', true)
+                ->where('is_recommended', 1)
                 ->with(['category:id,uuid,name', 'discount:id,uuid,discount_percentage'])
                 ->orderBy('created_at', 'desc')
                 ->get();
