@@ -20,6 +20,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\ProductFeedbackController;
 use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\ProvinceController;
+use App\Http\Controllers\ServiceController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\WishlistController;
 use App\Http\Middleware\JwtMiddleware;
@@ -60,6 +61,14 @@ Route::prefix('images')->group(function () {
 Route::prefix('contact-us')->group(function () {
     Route::post('/', [ContactUsController::class, 'store']); 
 });
+
+
+// Public Routes
+Route::prefix('services')->group(function () {
+    Route::post('/', [ServiceController::class, 'store']);   
+    Route::get('/', [ServiceController::class, 'index']);    
+});
+
 
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
