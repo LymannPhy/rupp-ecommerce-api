@@ -569,6 +569,7 @@ class ProductController extends Controller
                 'price' => 'sometimes|required|numeric|min:0',
                 'stock' => 'sometimes|required|integer|min:0',
                 'is_preorder' => 'sometimes|boolean',
+                'is_recommended' => 'sometimes|boolean',
                 'multi_images' => 'nullable|array',
                 'multi_images.*' => 'string|max:255',
             ]);
@@ -601,6 +602,7 @@ class ProductController extends Controller
                 'price' => $request->price ?? $product->price,
                 'stock' => $request->stock ?? $product->stock,
                 'is_preorder' => filter_var($request->is_preorder, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $product->is_preorder,
+                'is_recommended' => filter_var($request->is_recommended, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) ?? $product->is_recommended,
                 'multi_images' => $multiImages,
             ]);
 
@@ -613,6 +615,7 @@ class ProductController extends Controller
                 'price' => $product->price,
                 'stock' => $product->stock,
                 'is_preorder' => $product->is_preorder,
+                'is_recommended' => $product->is_recommended,
                 'single_image' => $request->multi_images ? ($request->multi_images[0] ?? null) : (json_decode($product->multi_images, true)[0] ?? null),
                 'images' => json_decode($product->multi_images, true) ?? [],
                 'created_at' => $product->created_at,
