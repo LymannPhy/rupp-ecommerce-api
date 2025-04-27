@@ -72,9 +72,13 @@ Route::prefix('services')->group(function () {
 
 Route::prefix('products')->group(function () {
     Route::get('/', [ProductController::class, 'index']);
+    Route::get('/limited-discounted', [ProductController::class, 'getFiveDiscountedProducts']);
     Route::get('/discounted', [ProductController::class, 'getDiscountedProducts']);
+    Route::get('/limited-popular-products', [ProductController::class, 'getFivePopularProducts']);
     Route::get('/popular-products', [ProductController::class, 'getPopularProducts']);
+    Route::get('/limited-recommended', [ProductController::class, 'getFiveRecommended']);
     Route::get('/recommended', [ProductController::class, 'recommended']);
+    Route::get('/limited-preorders', [ProductController::class, 'getFivePreorderProducts']);
     Route::get('/preorders', [ProductController::class, 'getPreorderProducts']);
     Route::get('/{uuid}', [ProductController::class, 'show']);
 });

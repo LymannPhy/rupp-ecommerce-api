@@ -20,6 +20,58 @@ class ProductController extends Controller
     /**
      * Get all pre-order products with pagination and the count of orders for each product.
     */
+    public function getFivePreorderProducts(Request $request)
+    {
+        try {
+            // Get all pre-order products
+            $preorderProducts = Product::where('is_preorder', true)
+                ->with(['discount'])
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get(); 
+
+            // Format each product data and count the number of orders for each product
+            $formattedProducts = $preorderProducts->map(function ($product) {
+                // Calculate discounted price if a discount is set
+                $discountedPrice = null;
+                if ($product->discount && isset($product->discount->percentage)) {
+                    $discountAmount = ($product->discount->percentage / 100) * $product->price;
+                    $discountedPrice = round($product->price - $discountAmount, 2);
+                }
+
+                // Count the number of orders for this product
+                $orderCount = OrderItem::where('product_id', $product->id)->count();
+
+                // Decode multi_images and get the first image as single_image
+                $allImages = json_decode($product->multi_images, true);
+                if (!is_array($allImages)) {
+                    $allImages = []; 
+                }
+                $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
+
+                return [
+                    'uuid' => $product->uuid,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'discount_price' => $discountedPrice,
+                    'is_preorder' => $product->is_preorder,
+                    'single_image' => $singleImage,
+                    'created_at' => $product->created_at,
+                    'order_count' => $orderCount, 
+                ];
+            });
+
+            // Include the formatted products in the response
+            return ApiResponse::sendResponse($formattedProducts, 'Pre-order products retrieved successfully');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to retrieve pre-order products', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Get all pre-order products with pagination and the count of orders for each product.
+    */
     public function getPreorderProducts(Request $request)
     {
         try {
@@ -65,6 +117,69 @@ class ProductController extends Controller
             return ApiResponse::sendResponse($formattedProducts, 'Pre-order products retrieved successfully');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve pre-order products', ['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Retrieve recommended products sorted by creation date with pagination and the count of orders.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getFiveRecommended(Request $request)
+    {
+        try {
+            // Get recommended products
+            $products = Product::where('is_deleted', false)
+                ->where('is_recommended', 1)
+                ->with(['category:id,uuid,name', 'discount:id,uuid,discount_percentage'])
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+
+            // Format each product data and count the number of orders for each product
+            $formattedProducts = $products->map(function ($product) {
+                // Calculate discounted price if a discount is set
+                $discountedPrice = null;
+                if ($product->discount && isset($product->discount->discount_percentage)) {
+                    $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
+                    $discountedPrice = round($product->price - $discountAmount, 2);
+                }
+
+                // Calculate average rating (if applicable)
+                $averageRating = ProductFeedback::where('product_id', $product->id)->avg('rating') ?? 0;
+
+                // ✅ Decode multi_images column correctly
+                $allImages = json_decode($product->multi_images, true); 
+                if (!is_array($allImages)) {
+                    $allImages = []; // Ensure it defaults to an empty array
+                }
+                $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
+
+                // Count the number of orders for this product
+                $orderCount = OrderItem::where('product_id', $product->id)->count();
+
+                return [
+                    'uuid' => $product->uuid,
+                    'category_name' => $product->category->name ?? null,
+                    'name' => $product->name,
+                    'description' => $product->description,
+                    'price' => $product->price,
+                    'discount_percentage' => $product->discount->discount_percentage ?? 0,
+                    'discounted_price' => $discountedPrice,
+                    'stock' => $product->stock,
+                    'is_recommended' => $product->is_recommended,
+                    'average_rating' => round($averageRating, 2),
+                    'single_image' => $singleImage,
+                    'created_at' => $product->created_at,
+                    'updated_at' => $product->updated_at,
+                    'order_count' => $orderCount, // Add order count for this product
+                ];
+            });
+
+            return ApiResponse::sendResponse($formattedProducts, 'Recommended products retrieved successfully');
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to retrieve recommended products', ['error' => $e->getMessage()], 500);
         }
     }
 
@@ -138,7 +253,7 @@ class ProductController extends Controller
      * @param Request $request
      * @return \Illuminate\Http\JsonResponse
      */
-    public function getPopularProducts(Request $request)
+    public function getFivePopularProducts(Request $request)
     {
         try {
             // Get filters from request
@@ -246,6 +361,245 @@ class ProductController extends Controller
             return ApiResponse::sendResponse($responseData, 'Top products retrieved successfully');
         } catch (\Exception $e) {
             return ApiResponse::error('An error occurred while fetching the products', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ], 500);
+        }
+    }
+
+
+    /**
+     * Get the top products based on orders, views, rating, and product feedback with filtering options.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getPopularProducts(Request $request)
+    {
+        try {
+            // Get filters from request
+            $categoryUuid = $request->query('category_uuid');
+            $subCategoryUuid = $request->query('subcategory_uuid');
+            $minPrice = $request->query('min_price');
+            $maxPrice = $request->query('max_price');
+            $search = $request->query('search');
+
+            // Build query with eager loading and additional counts/averages
+            $query = Product::where('is_deleted', false)
+                ->with(['category:id,name', 'discount'])
+                ->withCount('orderItems')  // Count the number of related order items
+                ->withCount('feedbacks')
+                ->withAvg('feedbacks', 'rating');
+
+            // 🔹 Filter by category
+            if ($categoryUuid) {
+                $category = Category::where('uuid', $categoryUuid)->first();
+                if ($category) {
+                    $query->where('category_id', $category->id);
+                }
+            }
+
+            // 🔹 Filter by subcategory
+            if ($subCategoryUuid) {
+                $subCategory = Category::where('uuid', $subCategoryUuid)->first();
+                if ($subCategory) {
+                    $query->where('category_id', $subCategory->id);
+                }
+            }
+
+            // 🔹 Filter by price range
+            if ($minPrice !== null) {
+                $query->where('price', '>=', (float) $minPrice);
+            }
+            if ($maxPrice !== null) {
+                $query->where('price', '<=', (float) $maxPrice);
+            }
+
+            // 🔹 Search by product name
+            if ($search) {
+                $query->where('name', 'LIKE', '%' . $search . '%');
+            }
+
+            // Order by a composite popularity score:
+            // Composite Score = (orderItems_count * 3) + (views * 0.1) + (COALESCE(feedbacks_avg_rating, 0) * 2) + (feedbacks_count)
+            $query->orderByRaw("((order_items_count * 3) + (views * 0.1) + (COALESCE(feedbacks_avg_rating, 0) * 2) + (feedbacks_count)) DESC");
+
+            // Get the top 5 products
+            $topProducts = $query->get();
+
+            if ($topProducts->isEmpty()) {
+                return ApiResponse::error('No products found', [], 404);
+            }
+
+            // Format response data
+            $responseData = $topProducts->map(function ($product) {
+                $discountedPrice = null;
+                $discountPercentage = 0;
+
+                // ✅ Handle Discount Calculation
+                if ($product->discount) {
+                    $discountPercentage = (float) $product->discount->discount_percentage;
+                    $isActive = (bool) $product->discount->is_active;
+                    $startDate = $product->discount->start_date ? \Carbon\Carbon::parse($product->discount->start_date) : null;
+                    $endDate = $product->discount->end_date ? \Carbon\Carbon::parse($product->discount->end_date) : null;
+                    $now = now();
+
+                    // Check if discount is active and valid based on dates
+                    if ($isActive && $startDate && $now >= $startDate && (!$endDate || $now <= $endDate)) {
+                        // Calculate discount
+                        $discountAmount = ($discountPercentage / 100) * $product->price;
+                        $discountedPrice = round($product->price - $discountAmount, 2);
+                    }
+                }
+
+                // ✅ Process Images
+                $allImages = json_decode($product->multi_images, true);
+                if (!is_array($allImages)) {
+                    $allImages = []; // Ensure it's an array
+                }
+                $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
+
+                return [
+                    'uuid'               => $product->uuid,
+                    'name'               => $product->name,
+                    'description'        => $product->description,
+                    'single_image'       => $singleImage,  
+                    'price'              => $product->price,
+                    'discount_percentage'=> $discountPercentage,
+                    'discounted_price'   => $discountedPrice,
+                    'stock'              => $product->stock,
+                    'category'           => $product->category->name ?? null,
+                    'is_preorder'        => $product->is_preorder,
+                    'order_count'        => $product->order_items_count,  // This is the count of order items for the product
+                    'views'              => $product->views,
+                    'feedback_count'     => $product->feedbacks_count,
+                    'average_rating'     => round($product->feedbacks_avg_rating ?? 0, 2),
+                    'created_at'         => $product->created_at,
+                    'updated_at'         => $product->updated_at,
+                ];
+            });
+
+            return ApiResponse::sendResponse($responseData, 'Top products retrieved successfully');
+        } catch (\Exception $e) {
+            return ApiResponse::error('An error occurred while fetching the products', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ], 500);
+        }
+    }
+
+
+    /**
+     * Get all discounted products with search, filter, and pagination.
+     *
+     * @param Request $request
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function getFiveDiscountedProducts(Request $request)
+    {
+        try {
+            // 🔹 Validate request parameters
+            $validated = $request->validate([
+                'search' => 'nullable|string|max:255',
+                'category_id' => 'nullable|exists:categories,id',
+                'sub_category_id' => 'nullable|exists:sub_categories,id',
+                'min_price' => 'nullable|numeric|min:0',
+                'max_price' => 'nullable|numeric|min:0',
+                'page' => 'nullable|integer|min:1',
+                'page_size' => 'nullable|integer|min:1|max:100',
+            ]);
+
+            // 🔹 Fetch discounted products with filters
+            $query = Product::whereNotNull('discount_id')
+                ->where('is_deleted', false)
+                ->whereHas('discount', function ($q) {
+                    $q->where('is_active', true)
+                        ->whereDate('start_date', '<=', now())
+                        ->whereDate('end_date', '>=', now());
+                })
+                ->with([
+                    'discount:id,uuid,name,discount_percentage,start_date,end_date,is_active',
+                    'category:id,name',
+                ])
+                ->withCount('orderItems');  // Added orderItems count
+
+            // 🔹 Apply search filter (by product name)
+            if (!empty($validated['search'])) {
+                $query->where('name', 'LIKE', '%' . $validated['search'] . '%');
+            }
+
+            // 🔹 Apply category filter
+            if (!empty($validated['category_id'])) {
+                $query->where('category_id', $validated['category_id']);
+            }
+
+            // 🔹 Apply sub-category filter (assuming sub_category_id exists in product model)
+            if (!empty($validated['sub_category_id'])) {
+                $query->where('sub_category_id', $validated['sub_category_id']);
+            }
+
+            // 🔹 Apply price range filter
+            if (!empty($validated['min_price'])) {
+                $query->where('price', '>=', $validated['min_price']);
+            }
+            if (!empty($validated['max_price'])) {
+                $query->where('price', '<=', $validated['max_price']);
+            }
+
+            // 🔹 Paginate results
+            $discountedProducts = $query->limit(5)->get();
+
+            // 🔹 Format response data
+            $responseData = $discountedProducts->map(function ($product) {
+                $discountedPrice = null;
+                $discountPercentage = 0;
+
+                // ✅ Handle Discount Calculation
+                if ($product->discount) {
+                    $discountPercentage = (float) $product->discount->discount_percentage;
+                    $isActive = (bool) $product->discount->is_active;
+                    $startDate = $product->discount->start_date ? \Carbon\Carbon::parse($product->discount->start_date) : null;
+                    $endDate = $product->discount->end_date ? \Carbon\Carbon::parse($product->discount->end_date) : null;
+                    $now = now();
+
+                    // Check if discount is active and valid based on dates
+                    if ($isActive && $startDate && $now >= $startDate && (!$endDate || $now <= $endDate)) {
+                        // Calculate discount
+                        $discountAmount = ($discountPercentage / 100) * $product->price;
+                        $discountedPrice = round($product->price - $discountAmount, 2);
+                    }
+                }
+
+                // ✅ Process Images from `multi_images`
+                $allImages = json_decode($product->multi_images, true);
+                if (!is_array($allImages)) {
+                    $allImages = []; // Ensure it's an array
+                }
+                $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
+
+                return [
+                    'uuid'               => $product->uuid,
+                    'name'               => $product->name,
+                    'description'        => $product->description,
+                    'single_image'       => $singleImage, 
+                    'price'              => $product->price,
+                    'discounted_price'   => $discountedPrice,
+                    'stock'              => $product->stock,
+                    'category'           => $product->category->name ?? null,
+                    'order_count'        => $product->order_items_count, // Include the order count here
+                    'created_at'         => $product->created_at,
+                    'updated_at'         => $product->updated_at,
+                ];
+            });
+
+            // 🔹 Use Pagination Helper to format response
+            return ApiResponse::sendResponse(
+                $responseData,
+                'Discounted products retrieved successfully'
+            );            
+
+        } catch (\Exception $e) {
+            return ApiResponse::error('An error occurred while fetching discounted products', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
             ], 500);
