@@ -120,12 +120,13 @@ class OrderController extends Controller
                 return ApiResponse::error('Order not found ❌', [], 404);
             }
 
-            // 🔹 Format the response data
+            // 🔹 Calculate total discount across items
+            $totalDiscount = 0;
             $formattedOrder = [
                 'uuid' => $order->uuid,
                 'order_code' => $order->order_code,
                 'delivery_fee' => $order->delivery_price,
-                'total_price' => $order->total_price, // ✅ Only returning total price
+                'total_price' => $order->total_price, 
                 'status' => $order->status,
                 'delivery_method' => $order->delivery_method,
                 'delivery_date' => $order->delivery_date ? $order->delivery_date->format('Y-m-d H:i:s') : null,
@@ -134,22 +135,26 @@ class OrderController extends Controller
                     'code' => $order->coupon->code,
                     'discount_percentage' => $order->coupon->discount_percentage,
                 ] : null,
-                'order_details' => $order->details ? [ // ✅ Include order details info
+                'order_details' => $order->details ? [ 
                     'email' => $order->details->email,
                     'phone_number' => $order->details->phone_number,
-                    'province' => $order->details->province ? $order->details->province->name : null, 
+                    'province' => $order->details->province ? $order->details->province->name : null,
                     'google_map_link' => $order->details->google_map_link,
                     'remarks' => $order->details->remarks,
                 ] : null,
-                'items' => $order->orderItems->map(function ($item) {
+                'items' => $order->orderItems->map(function ($item) use (&$totalDiscount) {
                     $product = $item->product;
 
                     // Calculate discounted price if applicable
                     $discountedPrice = $product->price;
+                    $itemDiscount = 0;
+
                     if ($product->discount && $product->discount->is_active &&
                         now() >= $product->discount->start_date && now() <= $product->discount->end_date) {
                         $discountAmount = ($product->discount->discount_percentage / 100) * $product->price;
                         $discountedPrice = round($product->price - $discountAmount, 2);
+                        $itemDiscount = $discountAmount * $item->quantity;
+                        $totalDiscount += $itemDiscount;
                     }
 
                     return [
@@ -165,6 +170,7 @@ class OrderController extends Controller
                             : null,
                     ];
                 }),
+                'total_discount' => round($totalDiscount, 2)
             ];
 
             return ApiResponse::sendResponse($formattedOrder, 'Order retrieved successfully ✅');
@@ -173,7 +179,6 @@ class OrderController extends Controller
             return ApiResponse::error('Failed to retrieve order 🔥', ['error' => $e->getMessage()], 500);
         }
     }
-
 
 
     /**
