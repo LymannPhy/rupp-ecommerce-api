@@ -122,11 +122,12 @@ class OrderController extends Controller
 
             // 🔹 Calculate total discount across items
             $totalDiscount = 0;
+            $totalItemPrice = 0;
+
             $formattedOrder = [
                 'uuid' => $order->uuid,
                 'order_code' => $order->order_code,
                 'delivery_fee' => $order->delivery_price,
-                'total_price' => $order->total_price, 
                 'status' => $order->status,
                 'delivery_method' => $order->delivery_method,
                 'delivery_date' => $order->delivery_date ? $order->delivery_date->format('Y-m-d H:i:s') : null,
@@ -142,7 +143,7 @@ class OrderController extends Controller
                     'google_map_link' => $order->details->google_map_link,
                     'remarks' => $order->details->remarks,
                 ] : null,
-                'items' => $order->orderItems->map(function ($item) use (&$totalDiscount) {
+                'items' => $order->orderItems->map(function ($item) use (&$totalDiscount, &$totalItemPrice) {
                     $product = $item->product;
 
                     // Calculate discounted price if applicable
@@ -157,21 +158,35 @@ class OrderController extends Controller
                         $totalDiscount += $itemDiscount;
                     }
 
+                    $itemTotalPrice = round($item->quantity * $discountedPrice, 2);
+                    $totalItemPrice += $itemTotalPrice;
+
                     return [
                         'product_uuid' => $product->uuid,
                         'product_name' => $product->name,
                         'quantity' => $item->quantity,
                         'original_price' => $product->price,
                         'discounted_price' => $discountedPrice,
-                        'total_price' => round($item->quantity * $discountedPrice, 2),
+                        'total_price' => $itemTotalPrice,
                         'is_preorder' => $product->is_preorder,
                         'image' => $product->multi_images 
                             ? (is_string($product->multi_images) ? json_decode($product->multi_images, true) : $product->multi_images)[0] ?? null 
                             : null,
                     ];
                 }),
-                'total_discount' => round($totalDiscount, 2)
             ];
+
+            // Apply coupon discount if available
+            if ($order->coupon) {
+                $couponDiscountAmount = ($order->coupon->discount_percentage / 100) * $totalItemPrice;
+                $totalPriceWithCoupon = $totalItemPrice + $order->delivery_price - $couponDiscountAmount;
+            } else {
+                $totalPriceWithCoupon = $totalItemPrice + $order->delivery_price;
+            }
+
+            // Add the coupon discount to the response and finalize the total price
+            $formattedOrder['total_price'] = round($totalPriceWithCoupon, 2);
+            $formattedOrder['total_discount'] = round($totalDiscount + (isset($couponDiscountAmount) ? $couponDiscountAmount : 0), 2);
 
             return ApiResponse::sendResponse($formattedOrder, 'Order retrieved successfully ✅');
             
