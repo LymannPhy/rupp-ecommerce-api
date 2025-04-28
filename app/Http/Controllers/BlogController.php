@@ -158,42 +158,54 @@ class BlogController extends Controller
 
 
 
-    public function publishBlogByUuid(string $uuid)
+    public function togglePublishBlogByUuid(string $uuid)
     {
         try {
-            // 🔍 Find the blog by UUID
+            // 🔍 Find the blog by UUID (only not deleted blogs)
             $blog = Blog::where('uuid', $uuid)->where('is_deleted', false)->first();
 
             if (!$blog) {
                 return ApiResponse::error('Blog not found ❌', ['uuid' => $uuid], 404);
             }
 
+            // 🔵 Toggle the blog's publication status
             if ($blog->status === 'published') {
-                return ApiResponse::error('Blog is already published ✅', [], 400);
+                // 🔻 If already published -> Unpublish it
+                $blog->update([
+                    'status' => 'unpublished',
+                    'published_at' => null,
+                ]);
+
+                $message = 'Blog unpublished successfully 🚫';
+            } else {
+                // 🔺 If unpublished -> Publish it
+                $blog->update([
+                    'status' => 'published',
+                    'published_at' => now(),
+                ]);
+
+                // 📧 Send email to the author
+                $user = $blog->user;
+                if ($user) {
+                    Mail::to($user->email)->send(new BlogPublishedMail($blog, $user));
+                }
+
+                $message = 'Blog published successfully ✅';
             }
-
-            // ✅ Publish the blog
-            $blog->update([
-                'status' => 'published',
-                'published_at' => now(),
-            ]);
-
-            // 📧 Send email to the author
-            $user = $blog->user; 
-            Mail::to($user->email)->send(new BlogPublishedMail($blog, $user));
 
             return ApiResponse::sendResponse([
                 'uuid' => $blog->uuid,
                 'status' => $blog->status,
                 'published_at' => $blog->published_at,
-            ], 'Blog published successfully ✅');
+            ], $message);
 
         } catch (\Exception $e) {
-            return ApiResponse::error('Failed to publish blog ❌', [
+            return ApiResponse::error('Failed to toggle publish status ❌', [
                 'error' => $e->getMessage(),
             ], 500);
         }
     }
+
 
 
     public function getTopTenBlogs()

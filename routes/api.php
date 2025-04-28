@@ -218,7 +218,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
         // ✅ Route for admin to confirm and give awards with rank
         Route::post('/{uuid}/award', [BlogController::class, 'confirmAward']);
         Route::get('/topTen', [BlogController::class, 'getTopTenBlogs']);
-        Route::patch('/{uuid}/publish', [BlogController::class, 'publishBlogByUuid']);
+        Route::patch('/toggle-publish/{uuid}', [BlogController::class, 'togglePublishBlogByUuid']);
         Route::get('/getBlogs', [BlogController::class, 'getAllBlogs']);
     });
 
