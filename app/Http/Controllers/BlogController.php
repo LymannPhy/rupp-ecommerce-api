@@ -19,6 +19,39 @@ use Illuminate\Support\Facades\Mail;
 
 class BlogController extends Controller
 {
+    /**
+     * Toggle the block status of a blog by its UUID.
+     *
+     * @param string $uuid
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function toggleBlockBlogByUuid(string $uuid)
+    {
+        try {
+            $blog = Blog::where('uuid', $uuid)->first();
+
+            if (!$blog) {
+                return ApiResponse::error('Blog not found', [], 404);
+            }
+
+            // 🔵 Toggle is_deleted status
+            $blog->is_deleted = !$blog->is_deleted;
+            $blog->save();
+
+            $message = $blog->is_deleted ? 'Blog blocked successfully' : 'Blog unblocked successfully';
+
+            return ApiResponse::sendResponse([
+                'uuid' => $blog->uuid,
+                'is_deleted' => $blog->is_deleted,
+            ], $message);
+        } catch (\Exception $e) {
+            return ApiResponse::error('Failed to toggle blog block status', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ], 500);
+        }
+    }
+
     public function getMyBlogs(Request $request)
     {
         $perPage = $request->query('per_page', 10);

@@ -231,6 +231,7 @@ Route::middleware([JwtMiddleware::class, 'role:admin'])->group(function () {
 
 
 Route::prefix('blogs')->group(function () {
+    Route::patch('/toggle-block/{uuid}', [BlogController::class, 'toggleBlockBlogByUuid']);
     Route::get('/tags', [BlogController::class, 'getAllTags']);
     Route::get('/top', [BlogController::class, 'getTopBlogs']);
     Route::get('/{uuid}', [BlogController::class, 'show']);
