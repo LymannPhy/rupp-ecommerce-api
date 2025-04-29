@@ -74,7 +74,7 @@ class AdminStatisticController extends Controller
                 ->get();
 
             // Revenue Trends (Last 12 months)
-            $revenueTrends = Payment::where('status', 'paid')
+            $revenueTrends = Payment::where('status', 'completed')
                 ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as date, SUM(amount) as total_revenue")
                 ->where('created_at', '>=', Carbon::now()->subMonths(12))
                 ->groupBy('date')
