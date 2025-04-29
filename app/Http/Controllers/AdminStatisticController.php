@@ -39,7 +39,7 @@ class AdminStatisticController extends Controller
                 ->sum('amount');
     
             // Count total products created this month
-            $totalProductsCount = Product::whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
+            $totalProductsCount = Product::where('is_deleted', false)->count();
     
             return ApiResponse::sendResponse([
                 'active_users' => $activeUsersCount,
