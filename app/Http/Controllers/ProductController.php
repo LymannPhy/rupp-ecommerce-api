@@ -1014,10 +1014,12 @@ class ProductController extends Controller
                 $query->where('price', '<=', $request->max_price);
             }
 
-            // 🔃 Sort by price
+            // 🔃 Sort by price or default by latest created
             if ($request->has('sort_price')) {
                 $sortOrder = $request->sort_price === 'desc' ? 'desc' : 'asc';
                 $query->orderBy('price', $sortOrder);
+            } else {
+                $query->orderBy('created_at', 'desc'); 
             }
 
             // 📦 Fetch all filtered products

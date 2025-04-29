@@ -24,28 +24,34 @@ class AdminStatisticController extends Controller
     public function index(): JsonResponse
     {
         try {
-            // Count active users
+            $startOfMonth = now()->startOfMonth();
+            $endOfMonth = now()->endOfMonth();
+    
+            // Count active users (not filtered by month, since users may be ongoing)
             $activeUsersCount = User::where('is_blocked', false)->count();
-
-            // Count total orders
-            $totalOrdersCount = Order::count();
-
-            // Calculate total payment amount
-            $totalPaymentAmount = Payment::where('status', 'completed')->sum('amount');
-
-            // Count total number of products
-            $totalProductsCount = Product::count();
-
+    
+            // Count total orders created this month
+            $totalOrdersCount = Order::whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
+    
+            // Calculate total payment amount this month
+            $totalPaymentAmount = Payment::where('status', 'paid')
+                ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+                ->sum('amount');
+    
+            // Count total products created this month
+            $totalProductsCount = Product::whereBetween('created_at', [$startOfMonth, $endOfMonth])->count();
+    
             return ApiResponse::sendResponse([
                 'active_users' => $activeUsersCount,
                 'total_orders' => $totalOrdersCount,
                 'total_payment' => $totalPaymentAmount,
                 'total_products' => $totalProductsCount,
-            ], 'Admin statistics retrieved successfully');
+            ], 'Admin statistics for current month retrieved successfully');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to fetch statistics', ['error' => $e->getMessage()], 500);
         }
     }
+    
 
     /**
      * Fetch dashboard statistics for admin.
@@ -74,7 +80,7 @@ class AdminStatisticController extends Controller
                 ->get();
 
             // Revenue Trends (Last 12 months)
-            $revenueTrends = Payment::where('status', 'completed')
+            $revenueTrends = Payment::where('status', 'paid')
                 ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as date, SUM(amount) as total_revenue")
                 ->where('created_at', '>=', Carbon::now()->subMonths(12))
                 ->groupBy('date')
