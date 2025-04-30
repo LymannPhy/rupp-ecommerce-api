@@ -631,15 +631,23 @@ class ProductController extends Controller
             $query = Product::whereNotNull('discount_id')
                 ->where('is_deleted', false)
                 ->whereHas('discount', function ($q) {
+                    $now = now();
                     $q->where('is_active', true)
-                        ->whereDate('start_date', '<=', now())
-                        ->whereDate('end_date', '>=', now());
+                    ->where(function ($q2) use ($now) {
+                        $q2->whereNull('start_date')
+                            ->orWhere('start_date', '<=', $now);
+                    })
+                    ->where(function ($q2) use ($now) {
+                        $q2->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $now);
+                    });
                 })
                 ->with([
                     'discount:id,uuid,name,discount_percentage,start_date,end_date,is_active',
                     'category:id,name',
                 ])
-                ->withCount('orderItems');  // Added orderItems count
+                ->withCount('orderItems');
+
 
             // 🔹 Apply search filter (by product name)
             if (!empty($validated['search'])) {
