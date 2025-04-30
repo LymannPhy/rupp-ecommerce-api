@@ -126,38 +126,40 @@ class WishlistController extends Controller
         $request->validate([
             'product_uuid' => 'required|exists:products,uuid',
         ]);
-
+    
         $user = Auth::user();
         $product_uuid = $request->product_uuid;
-
+    
         // Retrieve the product ID using the UUID
         $product = Product::where('uuid', $product_uuid)->first();
-
+    
         if (!$product) {
             return ApiResponse::error('Product not found', [], 404);
         }
-
+    
         // Check if product is already in wishlist
         $existingWishlist = Wishlist::where('user_id', $user->id)
             ->where('product_id', $product->id) 
             ->first();
-
+    
         if ($existingWishlist) {
-            return ApiResponse::error('Product is already in wishlist');
+            // Remove product from wishlist if it already exists
+            $existingWishlist->delete();
+            return ApiResponse::sendResponse([
+                'user_uuid' => $user->uuid,
+                'product_uuid' => $product->uuid,
+            ], 'Product removed from wishlist');
+        } else {
+            // Add product to wishlist if not already there
+            $wishlist = Wishlist::create([
+                'user_id' => $user->id,
+                'product_id' => $product->id, 
+            ]);
+            return ApiResponse::sendResponse([
+                'user_uuid' => $user->uuid,
+                'product_uuid' => $product->uuid,
+            ], 'Product added to wishlist');
         }
-
-        $wishlist = Wishlist::create([
-            'user_id' => $user->id,
-            'product_id' => $product->id, 
-        ]);
-
-        // Return product UUID and user UUID 
-        return ApiResponse::sendResponse([
-            'user_uuid' => $user->uuid,
-            'product_uuid' => $product->uuid,
-        ], 'Product added to wishlist');
     }
-
-
 }
 
