@@ -109,7 +109,7 @@ class ProductController extends Controller
                     'is_preorder' => $product->is_preorder,
                     'single_image' => $singleImage,
                     'created_at' => $product->created_at,
-                    'order_count' => $orderCount, // Add order count for this product
+                    'order_count' => $orderCount, 
                 ];
             });
 
@@ -455,7 +455,7 @@ class ProductController extends Controller
                 // ✅ Process Images
                 $allImages = json_decode($product->multi_images, true);
                 if (!is_array($allImages)) {
-                    $allImages = []; // Ensure it's an array
+                    $allImages = []; 
                 }
                 $singleImage = count($allImages) > 0 ? str_replace('\\', '/', array_shift($allImages)) : null;
 
@@ -470,7 +470,7 @@ class ProductController extends Controller
                     'stock'              => $product->stock,
                     'category'           => $product->category->name ?? null,
                     'is_preorder'        => $product->is_preorder,
-                    'order_count'        => $product->order_items_count,  // This is the count of order items for the product
+                    'order_count'        => $product->order_items_count,  
                     'views'              => $product->views,
                     'feedback_count'     => $product->feedbacks_count,
                     'average_rating'     => round($product->feedbacks_avg_rating ?? 0, 2),
@@ -513,15 +513,22 @@ class ProductController extends Controller
             $query = Product::whereNotNull('discount_id')
                 ->where('is_deleted', false)
                 ->whereHas('discount', function ($q) {
+                    $now = now();
                     $q->where('is_active', true)
-                        ->whereDate('start_date', '<=', now())
-                        ->whereDate('end_date', '>=', now());
+                    ->where(function ($q2) use ($now) {
+                        $q2->whereNull('start_date')
+                            ->orWhere('start_date', '<=', $now);
+                    })
+                    ->where(function ($q2) use ($now) {
+                        $q2->whereNull('end_date')
+                            ->orWhere('end_date', '>=', $now);
+                    });
                 })
                 ->with([
                     'discount:id,uuid,name,discount_percentage,start_date,end_date,is_active',
                     'category:id,name',
                 ])
-                ->withCount('orderItems');  // Added orderItems count
+                ->withCount('orderItems');
 
             // 🔹 Apply search filter (by product name)
             if (!empty($validated['search'])) {
