@@ -25,24 +25,21 @@ class ProductController extends Controller
         try {
             // Get all pre-order products
             $preorderProducts = Product::where('is_preorder', true)
-                ->with(['discount'])
+                ->with(['discount', 'category:id,name']) 
                 ->orderBy('created_at', 'desc')
                 ->take(5)
                 ->get(); 
 
-            // Format each product data and count the number of orders for each product
+            // Format each product data
             $formattedProducts = $preorderProducts->map(function ($product) {
-                // Calculate discounted price if a discount is set
                 $discountedPrice = null;
                 if ($product->discount && isset($product->discount->percentage)) {
                     $discountAmount = ($product->discount->percentage / 100) * $product->price;
                     $discountedPrice = round($product->price - $discountAmount, 2);
                 }
 
-                // Count the number of orders for this product
                 $orderCount = OrderItem::where('product_id', $product->id)->count();
 
-                // Decode multi_images and get the first image as single_image
                 $allImages = json_decode($product->multi_images, true);
                 if (!is_array($allImages)) {
                     $allImages = []; 
@@ -57,17 +54,18 @@ class ProductController extends Controller
                     'discount_price' => $discountedPrice,
                     'is_preorder' => $product->is_preorder,
                     'single_image' => $singleImage,
+                    'category_name' => $product->category->name ?? null, 
                     'created_at' => $product->created_at,
-                    'order_count' => $orderCount, 
+                    'order_count' => $orderCount,
                 ];
             });
 
-            // Include the formatted products in the response
             return ApiResponse::sendResponse($formattedProducts, 'Pre-order products retrieved successfully');
         } catch (\Exception $e) {
             return ApiResponse::error('Failed to retrieve pre-order products', ['error' => $e->getMessage()], 500);
         }
     }
+
 
     /**
      * Get all pre-order products with pagination and the count of orders for each product.
@@ -347,7 +345,7 @@ class ProductController extends Controller
                     'discount_percentage'=> $discountPercentage,
                     'discounted_price'   => $discountedPrice,
                     'stock'              => $product->stock,
-                    'category'           => $product->category->name ?? null,
+                    'category_name'           => $product->category->name ?? null,
                     'is_preorder'        => $product->is_preorder,
                     'order_count'        => $product->order_items_count,  // This is the count of order items for the product
                     'views'              => $product->views,
@@ -592,7 +590,7 @@ class ProductController extends Controller
                     'price'              => $product->price,
                     'discounted_price'   => $discountedPrice,
                     'stock'              => $product->stock,
-                    'category'           => $product->category->name ?? null,
+                    'category_name' => $product->category->name ?? null,
                     'order_count'        => $product->order_items_count, // Include the order count here
                     'created_at'         => $product->created_at,
                     'updated_at'         => $product->updated_at,
